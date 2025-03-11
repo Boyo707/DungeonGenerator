@@ -172,7 +172,7 @@ MonoBehaviour:
   testa: 0
   testb: 0
   minRoomSize: 5
-  splitDepth: 2
+  splitDepth: 1
   rooms: []
 --- !u!1 &330585543
 GameObject:
