@@ -1,29 +1,46 @@
 using UnityEngine;
 using System.Collections.Generic;
-using UnityEngine.Rendering;
-using UnityEditor.Rendering;
-using System.Runtime.InteropServices.WindowsRuntime;
+using NaughtyAttributes;
+using System.Collections;
+using UnityEngine.InputSystem.iOS.LowLevel;
 
 public class DungeonGenerator : MonoBehaviour
 {
     [SerializeField] private RectInt dungeonSize;
     [SerializeField] private int wallMargin = 1;
 
-    [SerializeField] private int testa;
-    [SerializeField] private int testb;
+    [SerializeField] private bool isCoroutine;
 
     [SerializeField] private int minRoomSize;
     [SerializeField] private int splitDepth;
 
     [SerializeField]private List<RectInt> rooms = new List<RectInt>();
+    private List<RectInt> displayRooms = new List<RectInt>();
 
     private bool isSplittingHorizontal = true;
+
+    [ReadOnly]private int maxRoomGenerations;
+    [ReadOnly]private int currentRoomGenerations = 0;
+
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        maxRoomGenerations = (int)Mathf.Pow(2, splitDepth);
         //SplitRoom(dungeonSize);
 
         SplitRoom1(dungeonSize);
+
+        if (isCoroutine)
+        {
+            StartCoroutine(DisplayRooms());
+        }
+        else
+        {
+            for (int i = 0; i < rooms.Count; i++)
+            {
+                displayRooms.Add(rooms[i]);
+            }
+        }
     }
 
     // Update is called once per frame
@@ -34,111 +51,99 @@ public class DungeonGenerator : MonoBehaviour
 
         Debug.Log(rooms.Count);
 
+
+        for (int i = 0; i < displayRooms.Count; i++)
+        {
+            AlgorithmsUtils.DebugRectInt(displayRooms[i], Color.blue);
+        }
+    }
+    IEnumerator DisplayRooms()
+    {
         for (int i = 0; i < rooms.Count; i++)
         {
-            AlgorithmsUtils.DebugRectInt(rooms[i], Color.blue);
+            yield return new WaitForSeconds(0.5f);
+            displayRooms.Add(rooms[i]);
         }
     }
 
 
     private void SplitRoom1(RectInt room)
-    { 
-        int splitAmount = Random.Range(0, 3);
+    {
+        Queue<RectInt> Q = new();
+        HashSet<RectInt> Discovered = new HashSet<RectInt>();
 
-        //create lengths - must happen once?
-        //random range int for one set of width and height
-        //calculate the remaining height and width
-        //store those 4 values perhaps in a rectInt just for storing or an array of ints
-        //created 2 lengths and 2 widths
+        Q.Enqueue(room);
 
-        //loop 4 times through to create the new 4 sets of rooms.
-        //create and add the new rect int to the rooms list
-        //then loop through the depth and keep repeating the cycle of calculating the lengths and creating the new rooms
-        //maybe add last created rooms into a seperate list containing the real final rooms.
-
-        //layer 1
-        RectInt[] roomsA = CreateRooms(room);
-
-        for (int i = 0; i < roomsA.Length; i++)
+        while (maxRoomGenerations > currentRoomGenerations - 2) 
         {
-            //get 1 room (i)
-            //create rooms from i
-            //
+            RectInt currentRoom = Q.Dequeue();
+            Discovered.Add(currentRoom);
+
+            RectInt[] splitRooms = CreateRooms(currentRoom);
+
+            for (int i = 0;i < splitRooms.Length; i++)
+            {
+                Q.Enqueue(splitRooms[i]);
+                rooms.Add(splitRooms[i]);
+                currentRoomGenerations++;
+            }
+            Debug.Log(currentRoomGenerations);
+            //Think of where and how to place the split horizontal bool
         }
-
-        //turn this into a for loop
-
-
-        //calcutlate heights and widths
-        //change them into rectInts
-        //create an array of the rooms
-
-        //splits it into 4, Loops through array
-        //Something that checks how many times it will subdivide them.
-        for (int i = 0; i < 1; i++)
-        {
-           
-
-            //split the I room depper with the split depth...
-            //create the diffrent rooms
-
-            //generate 1st layer
-
-            //loop through the list
-
-        }
-
-        for (int i = 0; i < splitDepth; i++)
-        {
-
-        }
-
-        RectInt newRoom = new RectInt(0, 0,
-            Random.Range(minRoomSize, room.width - minRoomSize),
-            Random.Range(minRoomSize, room.height - minRoomSize));
-
-        Debug.Log(newRoom.width);
-        Debug.Log(newRoom.height);
-
-        int someHeight = room.height - newRoom.height;
-        RectInt roomTop = new RectInt(0, newRoom.height, newRoom.width, someHeight);
-
-        int someWidth = room.width - roomTop.width;
-        RectInt roomTopOther = new RectInt(newRoom.width, newRoom.height, someWidth, roomTop.height);
-        RectInt roomBottomOther = new RectInt(newRoom.width, 0, someWidth, newRoom.height);
-
-        rooms.Add(roomsA[0]);
-        rooms.Add(roomsA[1]);
-        rooms.Add(roomsA[2]);
-        rooms.Add(roomsA[3]);
     }
 
-    public Vector2Int CalculateSizes(int currentLength, int maxLength)
+    
+
+    public RectInt[] CreateRooms(RectInt currentRoom)
     {
-        return new Vector2Int(currentLength, maxLength - currentLength);
-    }
+        int splitHeight = 0;
+        int splitLength = 0;
 
-    public RectInt[] CreateRooms(RectInt currentRoomSize)
-    {
-        
-        int randomHeight = Random.Range(minRoomSize, currentRoomSize.height - minRoomSize);
-        int randomWidth = Random.Range(minRoomSize, currentRoomSize.width - minRoomSize);
+        Vector2Int roomSize1 = Vector2Int.zero;
+        Vector2Int roomSize2 = Vector2Int.zero;
 
-        //uses the random sizes and the max sizes
-        Vector2Int heights = CalculateSizes(randomHeight, currentRoomSize.height);
-        Vector2Int widths = CalculateSizes(randomWidth, currentRoomSize.width);
+        RectInt[] nextRoomArray = new RectInt[2];
 
-        RectInt[] nextRoomArray = new RectInt[4];
+        if (isSplittingHorizontal)
+        {
+            splitHeight = Random.Range(minRoomSize, currentRoom.height - minRoomSize);
 
-        //top left
-        nextRoomArray[0] = new RectInt(0, 0, widths.x, heights.x);
-        //top right
-        nextRoomArray[1] = new RectInt(widths.x, 0, widths.y, heights.x);
-        //bottom left
-        nextRoomArray[2] = new RectInt(0, heights.x, widths.x, heights.y);
-        //bottom right
-        nextRoomArray[3] = new RectInt(widths.x, heights.x, widths.y, heights.y);
 
+            if (splitHeight < minRoomSize)
+            {
+                Debug.Log("MADE TO SMALL H");
+            }
+
+            roomSize1 = new Vector2Int(currentRoom.width, splitHeight);
+            roomSize2 = new Vector2Int(currentRoom.width, currentRoom.height - splitHeight);
+
+            //splitA
+            nextRoomArray[0] = new RectInt(currentRoom.x, currentRoom.y, roomSize1.x, roomSize1.y + wallMargin);
+            //top right
+            nextRoomArray[1] = new RectInt(currentRoom.x, roomSize1.y + currentRoom.y, roomSize2.x, roomSize2.y);
+
+            Debug.Log("Horizontal");
+        }
+        else
+        {
+            splitLength = Random.Range(minRoomSize, currentRoom.width - minRoomSize);
+
+            if (splitLength < minRoomSize)
+            {
+                Debug.Log("MADE TO SMALL V");
+            }
+
+
+            roomSize1 = new Vector2Int(splitLength, currentRoom.height);
+            roomSize2 = new Vector2Int(currentRoom.width - splitLength, currentRoom.height);
+
+            //splitA
+            nextRoomArray[0] = new RectInt(currentRoom.x, currentRoom.y, roomSize1.x + wallMargin, roomSize1.y);
+            //top right
+            nextRoomArray[1] = new RectInt(roomSize1.x + currentRoom.x, currentRoom.y, roomSize2.x, roomSize2.y);
+
+            Debug.Log("vertical");
+        }
         return nextRoomArray;
     }
 }

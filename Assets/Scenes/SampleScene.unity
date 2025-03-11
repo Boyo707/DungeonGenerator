@@ -166,13 +166,13 @@ MonoBehaviour:
   dungeonSize:
     x: 0
     y: 0
-    width: 50
+    width: 100
     height: 100
   wallMargin: 1
   testa: 0
   testb: 0
-  minRoomSize: 5
-  splitDepth: 1
+  minRoomSize: 8
+  splitDepth: 4
   rooms: []
 --- !u!1 &330585543
 GameObject:
