@@ -169,10 +169,9 @@ MonoBehaviour:
     width: 100
     height: 100
   wallMargin: 1
-  testa: 0
-  testb: 0
+  isCoroutine: 1
   minRoomSize: 8
-  splitDepth: 4
+  splitDepth: 6
   rooms: []
 --- !u!1 &330585543
 GameObject:
