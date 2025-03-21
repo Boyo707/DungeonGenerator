@@ -2,91 +2,77 @@ using UnityEngine;
 using System.Collections.Generic;
 using NaughtyAttributes;
 using System.Collections;
-using Unity.VisualScripting;
 
 public class DungeonGenerator : MonoBehaviour
 {
     [SerializeField] private RectInt dungeonSize;
     [SerializeField] private int wallMargin = 1;
-
-    [SerializeField] private bool isCoroutine;
-
     [SerializeField] private int minRoomSize;
     [SerializeField] private int splitDepth;
 
-    [SerializeField]private List<RectInt> rooms = new List<RectInt>();
-    private List<RectInt> displayRooms = new List<RectInt>();
+    [SerializeField] private float pauseTime;
+
+    Queue<RectInt> Q = new();
+    HashSet<RectInt> discovered = new HashSet<RectInt>();
+
+    private List<RectInt> rooms = new List<RectInt>();
+    private List<Color> drawColors = new List<Color>();
+    private Color depthColor = Color.red;
+
 
     private bool isSplittingHorizontal = true;
 
-    [ReadOnly]private int maxRoomGenerations;
-    [ReadOnly]private int roomCounter = 0;
+    private int currentDepth;
+    private int roomCounter = 0;
 
-    private int a = 1;
+    private int a = 0;
+    private int roomDeduction = 0;
+
+
+    private int b;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        maxRoomGenerations = (int)Mathf.Pow(2, splitDepth);
+        minRoomSize += wallMargin;
 
-        Debug.Log(maxRoomGenerations);
+        StartCoroutine(RoomGeneration(dungeonSize));
 
-        SplitRoom1(dungeonSize);
-
-        if (isCoroutine)
-        {
-            StartCoroutine(DisplayRooms());
-        }
-        else
-        {
-            for (int i = 0; i < rooms.Count; i++)
-            {
-                displayRooms.Add(rooms[i]);
-            }
-        }
     }
 
     // Update is called once per frame
     void Update()
     {
+        b = a * 2 - roomDeduction;
         //main dungeon size
         AlgorithmsUtils.DebugRectInt(dungeonSize, Color.red);
 
-        for (int i = 0; i < displayRooms.Count; i++)
-        {
-            AlgorithmsUtils.DebugRectInt(displayRooms[i], Color.blue);
-        }
-    }
-    IEnumerator DisplayRooms()
-    {
         for (int i = 0; i < rooms.Count; i++)
         {
-            yield return new WaitForSeconds(0.5f);
-            displayRooms.Add(rooms[i]);
+            AlgorithmsUtils.DebugRectInt(rooms[i], drawColors[i]);
         }
     }
 
-
-    private void SplitRoom1(RectInt room)
+    IEnumerator RoomGeneration(RectInt room)
     {
-        Queue<RectInt> Q = new();
-        HashSet<RectInt> Discovered = new HashSet<RectInt>();
-
         Q.Enqueue(room);
 
-        while (maxRoomGenerations != roomCounter && Q.Count != 0) 
+        while (currentDepth != splitDepth && Q.Count != 0) 
         {
             RectInt currentRoom = Q.Dequeue();
-            Discovered.Add(currentRoom);
 
-            if (CanGenerateRoom(currentRoom))
+            if (!discovered.Contains(currentRoom) && CanSplitRoom(currentRoom))
             {
-                RectInt[] splitRooms = CreateRooms(currentRoom);
+                discovered.Add(currentRoom);
+
+                RectInt[] splitRooms = SplitRoom(currentRoom);
 
                 for (int i = 0; i < splitRooms.Length; i++)
                 {
+                    yield return new WaitForSeconds(pauseTime);
                     Q.Enqueue(splitRooms[i]);
                     rooms.Add(splitRooms[i]);
+                    drawColors.Add(depthColor);
                     roomCounter++;
                 }
             }
@@ -94,62 +80,96 @@ public class DungeonGenerator : MonoBehaviour
             {
                 roomCounter += 2;
             }
-
-            Debug.Log(CanGenerateRoom(currentRoom));
-
             //room can't split vertically. Then never checks horizontal. leaving long hallways.
         }
     }
 
-    public bool CanGenerateRoom(RectInt currentRoom)
+    public bool CanSplitRoom(RectInt currentRoom)
     {
-        if (roomCounter == a * 2)
+        //Splits the room if it hit the end of the next level.
+        if (roomCounter + a == 0)
+        {
+            a = 1;
+        }
+        else if (roomCounter >= a * 2 - roomDeduction)
         {
             a = roomCounter;
             roomCounter = 0;
+            roomDeduction = 0;
+            currentDepth++;
+
             isSplittingHorizontal = !isSplittingHorizontal;
+
+            depthColor = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
         }
 
-        if (isSplittingHorizontal)
+        if(currentDepth == splitDepth)
         {
-            int maxHeight = currentRoom.height - minRoomSize;
-
-            if (maxHeight > minRoomSize)
-            {
-                return true;
-            }
-        }
-        else
-        {
-            int maxWidth = currentRoom.width - minRoomSize;
-
-            if (maxWidth > minRoomSize)
-            {
-                return true;
-            }
+            return false;
         }
         
+        bool checkSecondSplit = false;
+        bool currentSplit = isSplittingHorizontal;
+
+        for (int i = 0; i < 2; i++)
+        {
+            if (currentSplit)
+            {
+                int maxHeight = currentRoom.height - minRoomSize;
+
+                if (maxHeight > minRoomSize)
+                {
+                    if (!checkSecondSplit)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        Debug.Log($"Re qued {currentRoom} Horizontal split");
+                        discovered.Remove(currentRoom);
+                        Q.Enqueue(currentRoom);
+                        return false;
+                    }
+                }
+            }
+            else
+            {
+                int maxWidth = currentRoom.width - minRoomSize;
+
+                if (maxWidth > minRoomSize)
+                {
+                    if (!checkSecondSplit)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        Debug.Log($"Re qued {currentRoom} Vertical split");
+                        discovered.Remove(currentRoom);
+                        Q.Enqueue(currentRoom);
+                        return false;
+                    }
+                }
+            }
+            checkSecondSplit = true;
+            currentSplit = !currentSplit;
+        }
+
+        Debug.Log($"Room {currentRoom} couldnt split further");
+        roomDeduction += 2;
         return false;
     }
 
-    public RectInt[] CreateRooms(RectInt currentRoom)
+    public RectInt[] SplitRoom(RectInt currentRoom)
     {
-        int splitHeight = 0;
-        int splitLength = 0;
-
-        Vector2Int roomSize1 = Vector2Int.zero;
-        Vector2Int roomSize2 = Vector2Int.zero;
-
         RectInt[] nextRoomArray = new RectInt[2];
-
-        
 
         if (isSplittingHorizontal)
         {
-            splitHeight = Random.Range(minRoomSize, currentRoom.height - minRoomSize);
+            int splitHeight = Random.Range(minRoomSize, currentRoom.height - minRoomSize);
 
-            roomSize1 = new Vector2Int(currentRoom.width, splitHeight);
-            roomSize2 = new Vector2Int(currentRoom.width, currentRoom.height - splitHeight);
+            Vector2Int roomSize1 = new Vector2Int(currentRoom.width, splitHeight);
+            Vector2Int roomSize2 = new Vector2Int(currentRoom.width, currentRoom.height - splitHeight);
 
             //splitA
             nextRoomArray[0] = new RectInt(currentRoom.x, currentRoom.y, roomSize1.x, roomSize1.y + wallMargin);
@@ -158,10 +178,10 @@ public class DungeonGenerator : MonoBehaviour
         }
         else
         {
-            splitLength = Random.Range(minRoomSize, currentRoom.width - minRoomSize);
+            int splitLength = Random.Range(minRoomSize, currentRoom.width - minRoomSize);
 
-            roomSize1 = new Vector2Int(splitLength, currentRoom.height);
-            roomSize2 = new Vector2Int(currentRoom.width - splitLength, currentRoom.height);
+            Vector2Int roomSize1 = new Vector2Int(splitLength, currentRoom.height);
+            Vector2Int roomSize2 = new Vector2Int(currentRoom.width - splitLength, currentRoom.height);
 
             //splitA
             nextRoomArray[0] = new RectInt(currentRoom.x, currentRoom.y, roomSize1.x + wallMargin, roomSize1.y);
@@ -170,5 +190,15 @@ public class DungeonGenerator : MonoBehaviour
         }
 
         return nextRoomArray;
+    }
+
+    public void AddDoors()
+    {
+
+    }
+
+    public void DoorPath()
+    {
+
     }
 }
