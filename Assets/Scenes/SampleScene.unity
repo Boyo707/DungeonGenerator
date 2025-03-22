@@ -171,9 +171,7 @@ MonoBehaviour:
   wallMargin: 1
   minRoomSize: 5
   splitDepth: 6
-  isCoroutine: 0
-  pauseTime: 0
-  displayRooms: []
+  pauseTime: 0.3
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

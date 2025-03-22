@@ -12,11 +12,18 @@ public class DungeonGenerator : MonoBehaviour
 
     [SerializeField] private float pauseTime;
 
-    Queue<RectInt> Q = new();
-    HashSet<RectInt> discovered = new HashSet<RectInt>();
+    [SerializeField] private bool createdOn;
+    [SerializeField] private bool completedOn;
 
-    private List<RectInt> rooms = new List<RectInt>();
-    private List<Color> drawColors = new List<Color>();
+    Queue<RectInt> Q = new();
+    HashSet<RectInt> discovered = new();
+
+    private Dictionary<RectInt, int> rooms = new();
+
+    [SerializeField]private List<RectInt> completedRooms = new();
+    [SerializeField]private List<RectInt> createdRooms = new();
+
+    private List<Color> drawColors = new();
     private Color depthColor = Color.red;
 
 
@@ -47,10 +54,22 @@ public class DungeonGenerator : MonoBehaviour
         //main dungeon size
         AlgorithmsUtils.DebugRectInt(dungeonSize, Color.red);
 
-        for (int i = 0; i < rooms.Count; i++)
+
+        if (createdOn)
         {
-            AlgorithmsUtils.DebugRectInt(rooms[i], drawColors[i]);
+            for (int i = 0; i < createdRooms.Count; i++)
+            {
+                AlgorithmsUtils.DebugRectInt(createdRooms[i], drawColors[i]);
+            }
         }
+        if (completedOn)
+        {
+            for (int i = 0; i < completedRooms.Count; i++)
+            {
+                AlgorithmsUtils.DebugRectInt(completedRooms[i], Color.blue);
+            }
+        }
+
     }
 
     IEnumerator RoomGeneration(RectInt room)
@@ -71,7 +90,8 @@ public class DungeonGenerator : MonoBehaviour
                 {
                     yield return new WaitForSeconds(pauseTime);
                     Q.Enqueue(splitRooms[i]);
-                    rooms.Add(splitRooms[i]);
+                    rooms.Add(splitRooms[i],currentDepth);
+                    createdRooms.Add(splitRooms[i]);
                     drawColors.Add(depthColor);
                     roomCounter++;
                 }
@@ -81,6 +101,14 @@ public class DungeonGenerator : MonoBehaviour
                 roomCounter += 2;
             }
             //room can't split vertically. Then never checks horizontal. leaving long hallways.
+        }
+
+        foreach (KeyValuePair<RectInt, int> item in rooms)
+        {
+            if(item.Value == currentDepth || item.Value == currentDepth - 1)
+            {
+                completedRooms.Add(item.Key);
+            }
         }
     }
 
@@ -121,11 +149,13 @@ public class DungeonGenerator : MonoBehaviour
                 {
                     if (!checkSecondSplit)
                     {
+                        completedRooms.Remove(currentRoom);
                         return true;
                     }
                     else
                     {
                         Debug.Log($"Re qued {currentRoom} Horizontal split");
+                        completedRooms.Add(currentRoom);
                         discovered.Remove(currentRoom);
                         Q.Enqueue(currentRoom);
                         return false;
@@ -140,11 +170,13 @@ public class DungeonGenerator : MonoBehaviour
                 {
                     if (!checkSecondSplit)
                     {
+                        completedRooms.Remove(currentRoom);
                         return true;
                     }
                     else
                     {
                         Debug.Log($"Re qued {currentRoom} Vertical split");
+                        completedRooms.Add(currentRoom);
                         discovered.Remove(currentRoom);
                         Q.Enqueue(currentRoom);
                         return false;
@@ -156,6 +188,7 @@ public class DungeonGenerator : MonoBehaviour
         }
 
         Debug.Log($"Room {currentRoom} couldnt split further");
+        completedRooms.Add(currentRoom);
         roomDeduction += 2;
         return false;
     }
