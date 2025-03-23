@@ -168,10 +168,26 @@ MonoBehaviour:
     y: 0
     width: 100
     height: 100
-  wallMargin: 1
+  splitDepth: 7
+  checkRoom:
+    x: 0
+    y: 0
+    width: 10
+    height: 5
+  overlappingRoom:
+    x: 12
+    y: 0
+    width: 12
+    height: 5
   minRoomSize: 5
-  splitDepth: 6
-  pauseTime: 0.3
+  wallMargin: 1
+  doorSize: 2
+  pauseTime: 0
+  createdOn: 0
+  completedOn: 1
+  completedRooms: []
+  doors: []
+  createdRooms: []
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

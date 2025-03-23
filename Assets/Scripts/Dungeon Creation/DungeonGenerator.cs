@@ -6,9 +6,12 @@ using System.Collections;
 public class DungeonGenerator : MonoBehaviour
 {
     [SerializeField] private RectInt dungeonSize;
-    [SerializeField] private int wallMargin = 1;
-    [SerializeField] private int minRoomSize;
     [SerializeField] private int splitDepth;
+    [SerializeField] private RectInt checkRoom;
+    [SerializeField] private RectInt overlappingRoom;
+    [SerializeField] private int minRoomSize;
+    [SerializeField] private int wallMargin = 1;
+    [SerializeField] private int doorSize = 2;
 
     [SerializeField] private float pauseTime;
 
@@ -18,9 +21,10 @@ public class DungeonGenerator : MonoBehaviour
     Queue<RectInt> Q = new();
     HashSet<RectInt> discovered = new();
 
-    private Dictionary<RectInt, int> rooms = new();
+    private Dictionary<RectInt, int> roomData = new();
 
     [SerializeField]private List<RectInt> completedRooms = new();
+    [SerializeField]private List<RectInt> doors = new();
     [SerializeField]private List<RectInt> createdRooms = new();
 
     private List<Color> drawColors = new();
@@ -43,7 +47,7 @@ public class DungeonGenerator : MonoBehaviour
     {
         minRoomSize += wallMargin;
 
-        StartCoroutine(RoomGeneration(dungeonSize));
+        StartCoroutine(Generation(dungeonSize));
 
     }
 
@@ -70,9 +74,20 @@ public class DungeonGenerator : MonoBehaviour
             }
         }
 
+        for (int i = 0; i < doors.Count; i++)
+        {
+            AlgorithmsUtils.DebugRectInt(doors[i], Color.yellow);
+
+        }
+
+       // AlgorithmsUtils.DebugRectInt(checkRoom, Color.blue);
+        //AlgorithmsUtils.DebugRectInt(overlappingRoom, Color.red);
+
+        //AlgorithmsUtils.DebugRectInt(AddDoors(checkRoom, overlappingRoom), Color.yellow);
+
     }
 
-    IEnumerator RoomGeneration(RectInt room)
+    IEnumerator Generation(RectInt room)
     {
         Q.Enqueue(room);
 
@@ -90,7 +105,7 @@ public class DungeonGenerator : MonoBehaviour
                 {
                     yield return new WaitForSeconds(pauseTime);
                     Q.Enqueue(splitRooms[i]);
-                    rooms.Add(splitRooms[i],currentDepth);
+                    roomData.Add(splitRooms[i],currentDepth);
                     createdRooms.Add(splitRooms[i]);
                     drawColors.Add(depthColor);
                     roomCounter++;
@@ -100,17 +115,51 @@ public class DungeonGenerator : MonoBehaviour
             {
                 roomCounter += 2;
             }
-            //room can't split vertically. Then never checks horizontal. leaving long hallways.
         }
-
-        foreach (KeyValuePair<RectInt, int> item in rooms)
+        //AFTER CREATING ROOMS AND ENDING ON THE DEPTH
+        //sPLIT THE ROOMS THAT COULDNT BE SPLIT BEFORE. SO IT CANT LEAVE ODD LONG HALLWAYS.
+        foreach (KeyValuePair<RectInt, int> item in roomData)
         {
             if(item.Value == currentDepth || item.Value == currentDepth - 1)
             {
                 completedRooms.Add(item.Key);
             }
         }
+
+        //add doors here
+        //search through the completed rooms and search for interesecting rooms.
+        //Do the normal 4 door rooms and then the DFS
+
+        //CURRENT PROBLEM IS THAT IT DOESNT KEEP TRAC WHICH ROOMS HAVE CREATED DOORS
+        //can be solved with saving the indexes in a vector 2 and then comparing the reverse of one. If its included dont run
+        Debug.Log(completedRooms.Count);
+
+        List<Vector2Int> createdIndexes = new(); 
+
+        for (int i = 0; i < completedRooms.Count; i++)
+        {
+            for (int j = 0; j < completedRooms.Count; j++)
+            {
+                if (completedRooms[i] != completedRooms[j] && completedRooms[i].Overlaps(completedRooms[j]))
+                {
+                    if(!createdIndexes.Contains(new Vector2Int(j, i)))
+                    {
+                        createdIndexes.Add(new Vector2Int(i, j));
+                        RectInt door = AddDoors(completedRooms[i], completedRooms[j]);
+                        Debug.Log($"current room index {i} has overlapped with index{j}");
+                        if (door != RectInt.zero)
+                        {
+                            doors.Add(door);
+                            yield return new WaitForSeconds(0);
+                        }
+                    }
+                }
+            }
+
+        }
     }
+
+    
 
     public bool CanSplitRoom(RectInt currentRoom)
     {
@@ -187,6 +236,8 @@ public class DungeonGenerator : MonoBehaviour
             currentSplit = !currentSplit;
         }
 
+        
+
         Debug.Log($"Room {currentRoom} couldnt split further");
         completedRooms.Add(currentRoom);
         roomDeduction += 2;
@@ -225,9 +276,95 @@ public class DungeonGenerator : MonoBehaviour
         return nextRoomArray;
     }
 
-    public void AddDoors()
+    public RectInt AddDoors(RectInt currentRoom, RectInt overlappingRoom)
     {
 
+        Debug.Log("is overlapping");
+
+        //if the x is higher then its on the right, if its lower then its on the right.
+        //if the y is higher then its on the top, if its lower then its on the bottom.
+        RectInt door = RectInt.zero;
+
+        //if not gone its on the right, if its gone on the left
+        RectInt right = new RectInt(overlappingRoom.x - wallMargin, overlappingRoom.y, overlappingRoom.width, overlappingRoom.height);
+        RectInt left = new RectInt(overlappingRoom.x + wallMargin, overlappingRoom.y, overlappingRoom.width, overlappingRoom.height);
+
+        bool isRight = false;
+        bool isLeft = false;
+
+        if (currentRoom.Overlaps(right))
+        {
+            //Debug.Log("right");
+            isRight = true;
+            door = new RectInt(currentRoom.width - wallMargin, currentRoom.y, wallMargin, doorSize);
+        }
+        if (currentRoom.Overlaps(left))
+        {
+            //Debug.Log("left");
+            isLeft = true;
+            door = new RectInt(currentRoom.x, overlappingRoom.y, wallMargin, doorSize);
+        }
+        if (isRight && isLeft)
+        {
+            RectInt top = new RectInt(overlappingRoom.x, overlappingRoom.y - wallMargin, overlappingRoom.width, overlappingRoom.height);
+            RectInt bottom = new RectInt(overlappingRoom.x, overlappingRoom.y + wallMargin, overlappingRoom.width, overlappingRoom.height);
+
+            int minX = currentRoom.x > overlappingRoom.x ? currentRoom.x : overlappingRoom.x;
+
+            int widthA = currentRoom.x + currentRoom.width;
+            int widthB = overlappingRoom.x + overlappingRoom.width;
+
+            int maxX = widthA < widthB ? widthA : widthB;
+
+            if ((maxX + wallMargin) - (minX + wallMargin) >= wallMargin * 2 + doorSize)
+            {
+                minX += wallMargin;
+                maxX -= wallMargin + 1;
+            }
+            else
+            {
+                return RectInt.zero;
+            }
+
+            int randomX = Random.Range(minX, maxX);
+
+            if (currentRoom.Overlaps(top))
+            {
+                //Debug.Log("Top");
+                return door = new RectInt(randomX, currentRoom.height - wallMargin, doorSize, wallMargin);
+            }
+            else if (currentRoom.Overlaps(bottom))
+            {
+                //Debug.Log("Bottom");
+                return door = new RectInt(randomX, currentRoom.y, doorSize, wallMargin);
+            }
+        }
+        else
+        {
+            int minY = currentRoom.y > overlappingRoom.y ? currentRoom.y : overlappingRoom.y;
+
+            int heightA = currentRoom.y + currentRoom.height;
+            int heightB = overlappingRoom.y + overlappingRoom.height;
+
+            int maxY = heightA < heightB ? heightA : heightB;
+
+            if ((maxY + wallMargin) - (minY + wallMargin) >= wallMargin * 2 + doorSize)
+            {
+                minY += wallMargin;
+                maxY -= wallMargin + 1;
+            }
+            else
+            {
+                return RectInt.zero;
+            }
+
+            int randomY = Random.Range(minY, maxY);
+
+            door = new RectInt(door.x, randomY, door.width, door.height);
+
+            return door;
+        }
+        return RectInt.zero;
     }
 
     public void DoorPath()
