@@ -222,13 +222,11 @@ public class DungeonGenerator : MonoBehaviour
                 {
                     if (!checkSecondSplit)
                     {
-                        completedRooms.Remove(currentRoom);
                         return true;
                     }
                     else
                     {
                         //Debug.Log($"Re qued {currentRoom} Horizontal split");
-                        completedRooms.Add(currentRoom);
                         discovered.Remove(currentRoom);
                         Q.Enqueue(currentRoom);
                         return false;
@@ -243,13 +241,11 @@ public class DungeonGenerator : MonoBehaviour
                 {
                     if (!checkSecondSplit)
                     {
-                        completedRooms.Remove(currentRoom);
                         return true;
                     }
                     else
                     {
                         //Debug.Log($"Re qued {currentRoom} Vertical split");
-                        completedRooms.Add(currentRoom);
                         discovered.Remove(currentRoom);
                         Q.Enqueue(currentRoom);
                         return false;
@@ -263,7 +259,6 @@ public class DungeonGenerator : MonoBehaviour
         
 
         //Debug.Log($"Room {currentRoom} couldnt split further");
-        completedRooms.Add(currentRoom);
         roomDeduction += 2;
         return false;
     }

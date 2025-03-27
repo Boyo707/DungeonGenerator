@@ -172,11 +172,11 @@ MonoBehaviour:
   minRoomSize: 5
   wallMargin: 1
   doorSize: 2
-  canGenerateOnStart: 0
-  pauseTime: 1
+  canGenerateOnStart: 1
+  pauseTime: 0
   showCreated: 1
   showCompleted: 1
-  showDoors: 0
+  showDoors: 1
   debugRooms:
   - x: 10
     y: 10
