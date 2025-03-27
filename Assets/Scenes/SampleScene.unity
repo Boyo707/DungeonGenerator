@@ -163,15 +163,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 01f122aa6497cba4c82ed901f01cf944, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dungeonSize:
+  totalDungeonSize:
     x: 0
     y: 0
     width: 100
     height: 100
   splitDepth: 7
   minRoomSize: 5
+  wallHeight: 3
   wallMargin: 1
-  doorSize: 2
+  doorWidth: 2
+  dungeonSeed: 0
   canGenerateOnStart: 1
   pauseTime: 0
   showCreated: 1
@@ -186,7 +188,6 @@ MonoBehaviour:
     y: 0
     width: 10
     height: 10
-  completedRooms: []
   doors: []
   createdRooms: []
 --- !u!1 &330585543
