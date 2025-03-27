@@ -5,27 +5,30 @@ using System.Collections;
 
 public class DungeonGenerator : MonoBehaviour
 {
+    [Header("Dungeon Sizes")]
     [SerializeField] private RectInt dungeonSize;
     [SerializeField] private int splitDepth;
-    [SerializeField] private RectInt checkRoom;
-    [SerializeField] private RectInt overlappingRoom;
     [SerializeField] private int minRoomSize;
     [SerializeField] private int wallMargin = 1;
     [SerializeField] private int doorSize = 2;
 
+    [Header("Generation Settings")]
+    [SerializeField] private bool canGenerateOnStart = true;
     [SerializeField] private float pauseTime;
+    [SerializeField] private bool showCreated;
+    [SerializeField] private bool showCompleted;
+    [SerializeField] private bool showDoors;
 
-    [SerializeField] private bool createdOn;
-    [SerializeField] private bool completedOn;
+    [Header("Debug")]
+    [SerializeField] private List<RectInt> debugRooms = new List<RectInt>(2);
+    [SerializeField] private List<RectInt> completedRooms = new();
+    [SerializeField] private List<RectInt> doors = new();
+    [SerializeField] private List<RectInt> createdRooms = new();
 
     Queue<RectInt> Q = new();
     HashSet<RectInt> discovered = new();
 
     private Dictionary<RectInt, int> roomData = new();
-
-    [SerializeField]private List<RectInt> completedRooms = new();
-    [SerializeField]private List<RectInt> doors = new();
-    [SerializeField]private List<RectInt> createdRooms = new();
 
     private List<Color> drawColors = new();
     private Color depthColor = Color.red;
@@ -47,7 +50,10 @@ public class DungeonGenerator : MonoBehaviour
     {
         minRoomSize += wallMargin;
 
-        StartCoroutine(Generation(dungeonSize));
+        if (canGenerateOnStart)
+        {
+            StartCoroutine(Generation(dungeonSize));
+        }
 
     }
 
@@ -59,14 +65,14 @@ public class DungeonGenerator : MonoBehaviour
         AlgorithmsUtils.DebugRectInt(dungeonSize, Color.red);
 
 
-        if (createdOn)
+        if (showCreated)
         {
             for (int i = 0; i < createdRooms.Count; i++)
             {
                 AlgorithmsUtils.DebugRectInt(createdRooms[i], drawColors[i]);
             }
         }
-        if (completedOn)
+        if (showCompleted)
         {
             for (int i = 0; i < completedRooms.Count; i++)
             {
@@ -74,17 +80,32 @@ public class DungeonGenerator : MonoBehaviour
             }
         }
 
-        for (int i = 0; i < doors.Count; i++)
+        if (showDoors)
         {
-            AlgorithmsUtils.DebugRectInt(doors[i], Color.yellow);
-
+            for (int i = 0; i < doors.Count; i++)
+            {
+                AlgorithmsUtils.DebugRectInt(doors[i], Color.yellow);
+            }
         }
+        
+        if (!canGenerateOnStart)
+        {
+            AlgorithmsUtils.DebugRectInt(debugRooms[0], Color.blue);
 
-       // AlgorithmsUtils.DebugRectInt(checkRoom, Color.blue);
-        //AlgorithmsUtils.DebugRectInt(overlappingRoom, Color.red);
+            for (int i = 1; i < debugRooms.Count; i++)
+            {
 
-        //AlgorithmsUtils.DebugRectInt(AddDoors(checkRoom, overlappingRoom), Color.yellow);
-
+                AlgorithmsUtils.DebugRectInt(debugRooms[i], Color.red);
+                if (debugRooms[0].Overlaps(debugRooms[i]))
+                {
+                    AlgorithmsUtils.DebugRectInt(AddDoors(debugRooms[0], debugRooms[i]), Color.yellow);
+                    if (debugRooms[0].Overlaps(debugRooms[1]))
+                    {
+                        Debug.Log("Overlapping");
+                    }
+                }
+            }
+        }
     }
 
     IEnumerator Generation(RectInt room)
@@ -101,14 +122,24 @@ public class DungeonGenerator : MonoBehaviour
 
                 RectInt[] splitRooms = SplitRoom(currentRoom);
 
+                if (completedRooms.Contains(currentRoom))
+                {
+                    completedRooms.Remove(currentRoom);
+                }
+
                 for (int i = 0; i < splitRooms.Length; i++)
                 {
-                    yield return new WaitForSeconds(pauseTime);
                     Q.Enqueue(splitRooms[i]);
                     roomData.Add(splitRooms[i],currentDepth);
                     createdRooms.Add(splitRooms[i]);
+
+                    completedRooms.Add(splitRooms[i]);
+
                     drawColors.Add(depthColor);
                     roomCounter++;
+
+                    yield return new WaitForSeconds(pauseTime);
+
                 }
             }
             else
@@ -116,19 +147,9 @@ public class DungeonGenerator : MonoBehaviour
                 roomCounter += 2;
             }
         }
-        //AFTER CREATING ROOMS AND ENDING ON THE DEPTH
-        //sPLIT THE ROOMS THAT COULDNT BE SPLIT BEFORE. SO IT CANT LEAVE ODD LONG HALLWAYS.
-        foreach (KeyValuePair<RectInt, int> item in roomData)
-        {
-            if(item.Value == currentDepth || item.Value == currentDepth - 1)
-            {
-                completedRooms.Add(item.Key);
-            }
-        }
 
-        //add doors here
-        //search through the completed rooms and search for interesecting rooms.
-        //Do the normal 4 door rooms and then the DFS
+        //add the rooms that havent been split yet into the completed rooms.
+
 
         //CURRENT PROBLEM IS THAT IT DOESNT KEEP TRAC WHICH ROOMS HAVE CREATED DOORS
         //can be solved with saving the indexes in a vector 2 and then comparing the reverse of one. If its included dont run
@@ -147,12 +168,15 @@ public class DungeonGenerator : MonoBehaviour
                         createdIndexes.Add(new Vector2Int(i, j));
                         RectInt door = AddDoors(completedRooms[i], completedRooms[j]);
                         Debug.Log($"current room index {i} has overlapped with index{j}");
+                        
                         if (door != RectInt.zero)
                         {
                             doors.Add(door);
+                            Debug.Log(doors.Count);
                             yield return new WaitForSeconds(0);
                         }
                     }
+                    
                 }
             }
 
@@ -203,7 +227,7 @@ public class DungeonGenerator : MonoBehaviour
                     }
                     else
                     {
-                        Debug.Log($"Re qued {currentRoom} Horizontal split");
+                        //Debug.Log($"Re qued {currentRoom} Horizontal split");
                         completedRooms.Add(currentRoom);
                         discovered.Remove(currentRoom);
                         Q.Enqueue(currentRoom);
@@ -224,7 +248,7 @@ public class DungeonGenerator : MonoBehaviour
                     }
                     else
                     {
-                        Debug.Log($"Re qued {currentRoom} Vertical split");
+                        //Debug.Log($"Re qued {currentRoom} Vertical split");
                         completedRooms.Add(currentRoom);
                         discovered.Remove(currentRoom);
                         Q.Enqueue(currentRoom);
@@ -238,7 +262,7 @@ public class DungeonGenerator : MonoBehaviour
 
         
 
-        Debug.Log($"Room {currentRoom} couldnt split further");
+        //Debug.Log($"Room {currentRoom} couldnt split further");
         completedRooms.Add(currentRoom);
         roomDeduction += 2;
         return false;
@@ -294,15 +318,17 @@ public class DungeonGenerator : MonoBehaviour
 
         if (currentRoom.Overlaps(right))
         {
-            //Debug.Log("right");
+            Debug.Log("right");
             isRight = true;
-            door = new RectInt(currentRoom.width - wallMargin, currentRoom.y, wallMargin, doorSize);
+            door = new RectInt(currentRoom.x + currentRoom.width - wallMargin, currentRoom.y, wallMargin, doorSize);
+
         }
         if (currentRoom.Overlaps(left))
         {
-            //Debug.Log("left");
+            Debug.Log("left");
             isLeft = true;
             door = new RectInt(currentRoom.x, overlappingRoom.y, wallMargin, doorSize);
+
         }
         if (isRight && isLeft)
         {
@@ -331,7 +357,7 @@ public class DungeonGenerator : MonoBehaviour
             if (currentRoom.Overlaps(top))
             {
                 //Debug.Log("Top");
-                return door = new RectInt(randomX, currentRoom.height - wallMargin, doorSize, wallMargin);
+                return door = new RectInt(randomX, currentRoom.height + currentRoom.y - wallMargin, doorSize, wallMargin);
             }
             else if (currentRoom.Overlaps(bottom))
             {

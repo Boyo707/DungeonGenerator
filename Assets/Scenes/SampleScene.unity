@@ -169,22 +169,23 @@ MonoBehaviour:
     width: 100
     height: 100
   splitDepth: 7
-  checkRoom:
-    x: 0
-    y: 0
-    width: 10
-    height: 5
-  overlappingRoom:
-    x: 12
-    y: 0
-    width: 12
-    height: 5
   minRoomSize: 5
   wallMargin: 1
   doorSize: 2
-  pauseTime: 0
-  createdOn: 0
-  completedOn: 1
+  canGenerateOnStart: 0
+  pauseTime: 1
+  showCreated: 1
+  showCompleted: 1
+  showDoors: 0
+  debugRooms:
+  - x: 10
+    y: 10
+    width: 10
+    height: 10
+  - x: 10
+    y: 0
+    width: 10
+    height: 10
   completedRooms: []
   doors: []
   createdRooms: []
