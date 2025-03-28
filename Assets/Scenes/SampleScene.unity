@@ -174,20 +174,10 @@ MonoBehaviour:
   wallMargin: 1
   doorWidth: 2
   dungeonSeed: 0
-  canGenerateOnStart: 1
+  generateOnStart: 1
   pauseTime: 0
-  showCreated: 1
-  showCompleted: 1
+  showRooms: 1
   showDoors: 1
-  debugRooms:
-  - x: 10
-    y: 10
-    width: 10
-    height: 10
-  - x: 10
-    y: 0
-    width: 10
-    height: 10
   doors: []
   createdRooms: []
 --- !u!1 &330585543

@@ -2,6 +2,14 @@ using UnityEngine;
 using System.Collections.Generic;
 using NaughtyAttributes;
 using System.Collections;
+using System.Net.Mail;
+using UnityEditor.Experimental.GraphView;
+
+public enum SortingType
+{
+    Size,
+    Position
+}
 
 public class DungeonGenerator : MonoBehaviour
 {
@@ -23,6 +31,9 @@ public class DungeonGenerator : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private List<RectInt> doors = new();
     [SerializeField] private List<RectInt> createdRooms = new();
+    //key = door, value is connection
+    [SerializeField] private Dictionary<RectInt, List<RectInt>> doorConnections= new();
+
 
     Queue<RectInt> Q = new();
     HashSet<RectInt> discovered = new();
@@ -44,6 +55,8 @@ public class DungeonGenerator : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        Debug.Log(totalDungeonSize.xMin);
+        Debug.Log(totalDungeonSize.xMax);
         if(dungeonSeed != 0)
         {
             Random.InitState(dungeonSeed);
@@ -94,6 +107,7 @@ public class DungeonGenerator : MonoBehaviour
 
     IEnumerator Generation(RectInt room)
     {
+        #region Splitting
         //rooms splitting
         Q.Enqueue(room);
 
@@ -109,6 +123,7 @@ public class DungeonGenerator : MonoBehaviour
 
                 if (createdRooms.Contains(currentRoom))
                 {
+                    int index = createdRooms.IndexOf(currentRoom);
                     createdRooms.Remove(currentRoom);
                 }
 
@@ -129,28 +144,60 @@ public class DungeonGenerator : MonoBehaviour
                 roomCounter += 2;
             }
         }
-        
+        #endregion
+
+        #region Remove 10%
         //remove 10% of the smallest rooms
+        BubbleSorter(createdRooms, SortingType.Size);
 
+        int amountOfRooms = Mathf.RoundToInt(0.10f * createdRooms.Count);
 
-        //adding doors
-        List<Vector2Int> createdIndexes = new(); 
-
-        for (int i = 0; i < createdRooms.Count; i++)
+        for (int i = 0; i < amountOfRooms; i++)
         {
-            for (int j = 0; j < createdRooms.Count; j++)
+            createdRooms.RemoveAt(i);
+        }
+        #endregion
+
+        BubbleSorter(createdRooms, SortingType.Position);
+
+
+        Stack<RectInt> stackRooms = new();
+        Stack<RectInt> stackDoors = new();
+        HashSet<RectInt> Discovered = new HashSet<RectInt>();
+
+        RectInt[] previousRooms = new RectInt[2];
+
+        stackRooms.Push(createdRooms[0]);
+
+        while (stackRooms.Count > 0)
+        {
+            RectInt current = stackRooms.Pop();
+
+            if (!Discovered.Contains(current))
             {
-                if (createdRooms[i] != createdRooms[j] && createdRooms[i].Overlaps(createdRooms[j]))
+                Discovered.Add(current);
+
+                if(stackDoors.Count > 0)
                 {
-                    if(!createdIndexes.Contains(new Vector2Int(j, i)))
+                    RectInt currentDoor = stackDoors.Pop();
+                    doors.Add(currentDoor);
+
+                    AddDoorConnections(currentDoor, previousRooms);
+                }
+
+                foreach (RectInt node in createdRooms)
+                {
+                    if (current.Overlaps(node) && current != node && !Discovered.Contains(node))
                     {
-                        createdIndexes.Add(new Vector2Int(i, j));
-                        RectInt door = AddDoors(createdRooms[i], createdRooms[j]);
-                        
+                        RectInt door = AddDoors(current, node);
+
                         if (door != RectInt.zero)
                         {
-                            doors.Add(door);
-                            yield return new WaitForSeconds(0);
+                            stackDoors.Push(door);
+                            stackRooms.Push(node);
+                            previousRooms[0] = current;
+                            previousRooms[1] = node;
+                            yield return new WaitForSeconds(pauseTime);
                         }
                     }
                 }
@@ -260,88 +307,75 @@ public class DungeonGenerator : MonoBehaviour
 
         return nextRoomArray;
     }
-    public RectInt AddDoors(RectInt currentRoom, RectInt overlappingRoom)
-    { 
-        //if the x is higher then its on the right, if its lower then its on the right.
-        //if the y is higher then its on the top, if its lower then its on the bottom.
-        RectInt door = RectInt.zero;
-
-        bool isRight = false;
-        bool isLeft = false;
-
-        //if not gone its on the right, if its gone on the left
-        RectInt right = new RectInt(overlappingRoom.x - wallMargin, overlappingRoom.y, overlappingRoom.width, overlappingRoom.height);
-        RectInt left = new RectInt(overlappingRoom.x + wallMargin, overlappingRoom.y, overlappingRoom.width, overlappingRoom.height);
-
-        if (currentRoom.Overlaps(right))
+    private void BubbleSorter(List<RectInt> rooms, SortingType type)
+    {
+        for (int i = rooms.Count - 2; i >= 0; i--)
         {
-            isRight = true;
-            door = new RectInt(currentRoom.x + currentRoom.width - wallMargin, currentRoom.y, wallMargin, doorWidth);
-        }
-        if (currentRoom.Overlaps(left))
-        {
-            isLeft = true;
-            door = new RectInt(currentRoom.x, overlappingRoom.y, wallMargin, doorWidth);
-        }
-        if (isRight && isLeft)
-        {
-            RectInt top = new RectInt(overlappingRoom.x, overlappingRoom.y - wallMargin, overlappingRoom.width, overlappingRoom.height);
-            RectInt bottom = new RectInt(overlappingRoom.x, overlappingRoom.y + wallMargin, overlappingRoom.width, overlappingRoom.height);
-
-            int minX = currentRoom.x > overlappingRoom.x ? currentRoom.x : overlappingRoom.x;
-
-            int widthA = currentRoom.x + currentRoom.width;
-            int widthB = overlappingRoom.x + overlappingRoom.width;
-
-            int maxX = widthA < widthB ? widthA : widthB;
-
-            if ((maxX + wallMargin) - (minX + wallMargin) >= wallMargin * 2 + doorWidth)
+            for (int j = 0; j <= i; j++)
             {
-                minX += wallMargin;
-                maxX -= wallMargin + 1;
+                int sizeA = 0;
+                int sizeB = 0;
+
+                if (type == SortingType.Size)
+                {
+                    sizeA = rooms[j].width + rooms[j].height;
+                    sizeB = rooms[j + 1].width + rooms[j + 1].height;
+                }
+                else if(type == SortingType.Position)
+                {
+                    sizeA = rooms[j].x + rooms[j].y;
+                    sizeB = rooms[j + 1].x + rooms[j + 1].y;
+                }
+                
+                if (sizeA > sizeB)
+                {
+                    RectInt temp = rooms[j + 1];
+                    rooms[j + 1] = rooms[j];
+                    rooms[j] = temp;
+                }
             }
-            else
+        }
+    }
+    public RectInt AddDoors(RectInt currentRoom, RectInt overlappingRoom)
+    {
+        RectInt wall = AlgorithmsUtils.Intersect(currentRoom, overlappingRoom);
+
+        if (wall.width > wall.height)
+        {
+            //horizontal
+            if (wall.width < doorWidth + wallMargin * 2)
             {
                 return RectInt.zero;
             }
 
-            int randomX = Random.Range(minX, maxX);
+            wall = new RectInt(wall.x + wallMargin, wall.y, wall.width - wallMargin * 2, wall.height);
 
-            if (currentRoom.Overlaps(top))
-            {
-                return door = new RectInt(randomX, currentRoom.height + currentRoom.y - wallMargin, doorWidth, wallMargin);
-            }
-            else if (currentRoom.Overlaps(bottom))
-            {
-                return door = new RectInt(randomX, currentRoom.y, doorWidth, wallMargin);
-            }
+            int randomX = Random.Range(wall.xMin, wall.xMax - 1);
+
+            return new RectInt(randomX, wall.y, doorWidth, wall.height);
         }
         else
         {
-            int minY = currentRoom.y > overlappingRoom.y ? currentRoom.y : overlappingRoom.y;
-
-            int heightA = currentRoom.y + currentRoom.height;
-            int heightB = overlappingRoom.y + overlappingRoom.height;
-
-            int maxY = heightA < heightB ? heightA : heightB;
-
-            if ((maxY + wallMargin) - (minY + wallMargin) >= wallMargin * 2 + doorWidth)
-            {
-                minY += wallMargin;
-                maxY -= wallMargin + 1;
-            }
-            else
+            //vertical
+            if (wall.height < doorWidth + wallMargin * 2)
             {
                 return RectInt.zero;
             }
+            wall = new RectInt(wall.x , wall.y + wallMargin, wall.width , wall.height - wallMargin * 2);
 
-            int randomY = Random.Range(minY, maxY);
+            int randomY = Random.Range(wall.yMin, wall.yMax - 1);
 
-            door = new RectInt(door.x, randomY, door.width, door.height);
-
-            return door;
+            return new RectInt(wall.x, randomY, wall.width , doorWidth);
         }
-        return RectInt.zero;
     }
-    
+    private void AddDoorConnections(RectInt currentDoor, RectInt[] previousRooms)
+    {
+        if (!doorConnections.ContainsKey(currentDoor))
+        {
+            doorConnections[currentDoor] = new List<RectInt>();
+        }
+
+        doorConnections[currentDoor].Add(previousRooms[0]);
+        doorConnections[currentDoor].Add(previousRooms[1]);
+    }
 }
