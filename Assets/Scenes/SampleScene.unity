@@ -173,13 +173,15 @@ MonoBehaviour:
   wallHeight: 3
   wallMargin: 1
   doorWidth: 2
-  dungeonSeed: 0
+  dungeonSeed: 25
   generateOnStart: 1
   pauseTime: 0
+  pauseGeneration: 0
   showRooms: 1
   showDoors: 1
-  doors: []
+  showGraph: 1
   createdRooms: []
+  doors: []
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0

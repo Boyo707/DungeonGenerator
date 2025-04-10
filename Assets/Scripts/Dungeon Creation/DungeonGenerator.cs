@@ -1,9 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
-using NaughtyAttributes;
 using System.Collections;
-using System.Net.Mail;
-using UnityEditor.Experimental.GraphView;
 
 public enum SortingType
 {
@@ -25,19 +22,20 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField] private int dungeonSeed;
     [SerializeField] private bool generateOnStart = true;
     [SerializeField] private float pauseTime;
+    [SerializeField] private bool pauseGeneration = false;
     [SerializeField] private bool showRooms;
     [SerializeField] private bool showDoors;
+    [SerializeField] private bool showGraph;
 
     [Header("Debug")]
-    [SerializeField] private List<RectInt> doors = new();
     [SerializeField] private List<RectInt> createdRooms = new();
+    [SerializeField] private List<RectInt> doors = new();
     //key = door, value is connection
-    [SerializeField] private Dictionary<RectInt, List<RectInt>> doorConnections= new();
+    [SerializeField] private Dictionary<RectInt, List<RectInt>> doorConnections = new();
+    [SerializeField] private Dictionary<RectInt, List<RectInt>> roomConnections = new();
 
-
-    Queue<RectInt> Q = new();
-    HashSet<RectInt> discovered = new();
-
+    //maybe instead of an int you set the color in the dictionary.
+    //you can set the color in a function withing the adding color part.
     private Dictionary<RectInt, int> roomData = new();
 
     private List<Color> drawColors = new();
@@ -103,19 +101,42 @@ public class DungeonGenerator : MonoBehaviour
         {
             //Instant gen
         }
+
+        if (showGraph)
+        {
+            foreach (var item in doorConnections)
+            {
+                Vector3 doorCenter = GetCenter(item.Key);
+                DebugExtension.DebugWireSphere(doorCenter, Color.blue);
+
+                var roomConnection = doorConnections[item.Key];
+
+                for (int i = 0; i < roomConnection.Count; i++)
+                {
+                    Vector3 roomCenter = GetCenter(roomConnection[i]);
+                    DebugExtension.DebugWireSphere(roomCenter, Color.green);
+
+                    Debug.DrawLine(roomCenter, doorCenter);
+                }
+            }
+        }
     }
 
     IEnumerator Generation(RectInt room)
     {
-        #region Splitting
+        #region Rooms Splitting
         //rooms splitting
+
+        Queue<RectInt> Q = new();
+        HashSet<RectInt> discovered = new();
+
         Q.Enqueue(room);
 
         while (currentDepth != splitDepth && Q.Count != 0) 
         {
             RectInt currentRoom = Q.Dequeue();
 
-            if (!discovered.Contains(currentRoom) && CanSplitRoom(currentRoom))
+            if (!discovered.Contains(currentRoom) && CanSplitRoom(currentRoom, Q, discovered))
             {
                 discovered.Add(currentRoom);
 
@@ -160,51 +181,60 @@ public class DungeonGenerator : MonoBehaviour
 
         BubbleSorter(createdRooms, SortingType.Position);
 
-
+        #region Door Creation
         Stack<RectInt> stackRooms = new();
-        Stack<RectInt> stackDoors = new();
         HashSet<RectInt> Discovered = new HashSet<RectInt>();
 
-        RectInt[] previousRooms = new RectInt[2];
-
         stackRooms.Push(createdRooms[0]);
+
+        RectInt[] previousRooms = new RectInt[2];
 
         while (stackRooms.Count > 0)
         {
             RectInt current = stackRooms.Pop();
 
+            Debug.Log(current);
+
+            Debug.Log("length is " + previousRooms.Length);
+            Debug.Log("Contains a connection is " + !ContainsRoomConnection(previousRooms[0], previousRooms[1]));
+
+            //without Contains it will create multiple doors. 
+            //find a way to solve this
+            if(previousRooms.Length != 0 && !ContainsRoomConnection(previousRooms[0], previousRooms[1]))
+            {
+                Debug.Log("created door between " + previousRooms[0] + "\nand " + previousRooms[1]);
+                RectInt door = AddDoors(previousRooms[0], previousRooms[1]);
+                doors.Add(door);
+                
+                AddRoomConnection(door, previousRooms);
+                yield return new WaitForSeconds(pauseTime);
+                yield return new WaitUntil(() => !pauseGeneration);
+
+            }
+
             if (!Discovered.Contains(current))
             {
+                //Debug.Log("has not been discovered");
                 Discovered.Add(current);
-
-                if(stackDoors.Count > 0)
-                {
-                    RectInt currentDoor = stackDoors.Pop();
-                    doors.Add(currentDoor);
-
-                    AddDoorConnections(currentDoor, previousRooms);
-                }
 
                 foreach (RectInt node in createdRooms)
                 {
-                    if (current.Overlaps(node) && current != node && !Discovered.Contains(node))
+                    if(CanAddDoor(current, node) && !discovered.Contains(node) && !ContainsRoomConnection(current, node))
                     {
-                        RectInt door = AddDoors(current, node);
-
-                        if (door != RectInt.zero)
-                        {
-                            stackDoors.Push(door);
-                            stackRooms.Push(node);
-                            previousRooms[0] = current;
-                            previousRooms[1] = node;
-                            yield return new WaitForSeconds(pauseTime);
-                        }
+                        Debug.Log("current " + current);
+                        Debug.Log("Next " + node);
+                        previousRooms[0] = current;
+                        previousRooms[1] = node;
+                        stackRooms.Push(node);
                     }
                 }
             }
         }
+        #endregion
+
+
     }
-    public bool CanSplitRoom(RectInt currentRoom)
+    public bool CanSplitRoom(RectInt currentRoom, Queue<RectInt> q, HashSet<RectInt> discovered)
     {
         //Splits the room if it hit the end of the next level.
         if (roomCounter + a == 0)
@@ -246,7 +276,7 @@ public class DungeonGenerator : MonoBehaviour
                     else
                     {
                         discovered.Remove(currentRoom);
-                        Q.Enqueue(currentRoom);
+                        q.Enqueue(currentRoom);
                         return false;
                     }
                 }
@@ -264,7 +294,7 @@ public class DungeonGenerator : MonoBehaviour
                     else
                     {
                         discovered.Remove(currentRoom);
-                        Q.Enqueue(currentRoom);
+                        q.Enqueue(currentRoom);
                         return false;
                     }
                 }
@@ -336,6 +366,21 @@ public class DungeonGenerator : MonoBehaviour
             }
         }
     }
+
+    public bool CanAddDoor(RectInt roomA, RectInt roomB)
+    {
+        if (roomA != roomB)
+        {
+            RectInt intersection = AlgorithmsUtils.Intersect(roomA, roomB);
+            int minArea = doorWidth * (wallMargin * 2);
+            int area = intersection.width * intersection.height;
+            if (area > minArea)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     public RectInt AddDoors(RectInt currentRoom, RectInt overlappingRoom)
     {
         RectInt wall = AlgorithmsUtils.Intersect(currentRoom, overlappingRoom);
@@ -368,14 +413,121 @@ public class DungeonGenerator : MonoBehaviour
             return new RectInt(wall.x, randomY, wall.width , doorWidth);
         }
     }
-    private void AddDoorConnections(RectInt currentDoor, RectInt[] previousRooms)
+
+    public RectInt AddDoors2(RectInt currentRoom, RectInt overlappingRoom)
+    {
+        RectInt wall = AlgorithmsUtils.Intersect(currentRoom, overlappingRoom);
+
+        if (wall.width > wall.height)
+        {
+            //horizontal
+            wall = new RectInt(wall.x + wallMargin, wall.y, wall.width - wallMargin * 2, wall.height);
+
+            int randomX = Random.Range(wall.xMin, wall.xMax - 1);
+
+            return new RectInt(randomX, wall.y, doorWidth, wall.height);
+        }
+        else
+        {
+            //vertical
+            wall = new RectInt(wall.x, wall.y + wallMargin, wall.width, wall.height - wallMargin * 2);
+
+            int randomY = Random.Range(wall.yMin, wall.yMax - 1);
+
+            return new RectInt(wall.x, randomY, wall.width, doorWidth);
+        }
+    }
+
+    private void AddRoomConnection(RectInt currentDoor, RectInt[] connectedRooms)
     {
         if (!doorConnections.ContainsKey(currentDoor))
         {
             doorConnections[currentDoor] = new List<RectInt>();
         }
+        for (int i = 0; i < connectedRooms.Length; i++)
+        {
+            if (!roomConnections.ContainsKey(connectedRooms[i]))
+            {
+                roomConnections[connectedRooms[i]] = new List<RectInt>();
+            }
 
-        doorConnections[currentDoor].Add(previousRooms[0]);
-        doorConnections[currentDoor].Add(previousRooms[1]);
+        }
+
+        doorConnections[currentDoor].Add(connectedRooms[0]);
+        doorConnections[currentDoor].Add(connectedRooms[1]);
+        roomConnections[connectedRooms[0]].Add(currentDoor);
+        roomConnections[connectedRooms[1]].Add(currentDoor);
+    }
+
+    private bool ContainsRoomConnection(RectInt roomA, RectInt roomB)
+    {
+        //if room connections has the key room
+        if (roomConnections.ContainsKey(roomA))
+        {
+            //through each door connected to the room(s)
+            foreach (var door in roomConnections[roomA])
+            {
+                //for all the rooms connected to the door
+                foreach (var room in doorConnections[door])
+                {
+                    if(room == roomB)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+    private bool HasConnection(RectInt target, RectInt except)
+    {
+        if (roomConnections.ContainsKey(target))
+        {
+            foreach (var item in roomConnections[target])
+            {
+                if(item != except)
+                {
+                    return true;
+                }
+            }
+        }
+        else if (doorConnections.ContainsKey(target))
+        {
+            foreach (var item in doorConnections[target])
+            {
+                if (item != except)
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    private bool ContainsDoorConnection(RectInt doorA, RectInt doorB)
+    {
+        //if room connections has the key room
+        if (doorConnections.ContainsKey(doorA))
+        {
+            //through each door connected to the room(s)
+            foreach (var room in doorConnections[doorA])
+            {
+                //for all the rooms connected to the door
+                foreach (var door in roomConnections[room])
+                {
+                    if (room == doorB)
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private Vector3 GetCenter(RectInt target)
+    {
+        float x = target.xMin + (float)(target.xMax - target.xMin) / 2;
+        float y = target.yMin + (float)(target.yMax - target.yMin) / 2; 
+        return new Vector3(x, 0, y) ;
     }
 }
