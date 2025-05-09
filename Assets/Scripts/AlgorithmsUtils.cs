@@ -39,7 +39,7 @@ public class AlgorithmsUtils
         }
     }
     
-    public static void FillRectangleOutline(char[,] array, RectInt area, char value) 
+    public static void FillRectangleOutline(int[,] array, RectInt area, int value) 
     { 
         
         int endX = area.x + area.width - 1;

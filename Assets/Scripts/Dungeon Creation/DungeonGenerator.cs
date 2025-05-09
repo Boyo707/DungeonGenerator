@@ -1,6 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
+using UnityEditor;
+using NaughtyAttributes;
 
 public enum SortingType
 {
@@ -27,6 +29,11 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField] private bool showDoors;
     [SerializeField] private bool showGraph;
 
+    [Header("Visuals")]
+    [SerializeField] private Vector3 offset;
+    [SerializeField] private GameObject[] wallPrefabs;
+
+
     [Header("Debug")]
     [SerializeField] private List<RectInt> createdRooms = new();
     [SerializeField] private List<RectInt> doors = new();
@@ -49,6 +56,8 @@ public class DungeonGenerator : MonoBehaviour
 
     private int a = 0;
     private int roomDeduction = 0;
+
+    private int[,] binaryTileMap;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -232,8 +241,115 @@ public class DungeonGenerator : MonoBehaviour
         }
         #endregion
 
+        #region Visuals
+        int[,] tileMap = new int[totalDungeonSize.height, totalDungeonSize.width];
 
+        foreach (var rooming in createdRooms)
+        {
+            AlgorithmsUtils.FillRectangleOutline(tileMap, rooming, 1);
+        }
+
+        foreach (var door in doors)
+        {
+            AlgorithmsUtils.FillRectangleOutline(tileMap, door, 0);
+        }
+
+        ConvertToBinary(tileMap);
+
+        //y
+        for (int i = 0; i < binaryTileMap.GetLength(0); i++)
+        {
+            //x
+            for (int j = 0; j < binaryTileMap.GetLength(1); j++)
+            {
+                //Debug.Log(binaryTile[i, j]);
+                //walls 0 = empty
+                //walls 1 = wall end
+                //walls 2 = wall    
+                //walls 3 = wall corner
+
+
+                GameObject wall = gameObject;
+                Vector3 rotation = Vector3.zero;
+
+                switch (binaryTileMap[i, j])
+                {
+                    case 0:
+                        wall = wallPrefabs[0];
+                        rotation = new Vector3(0, 0, 0);
+                        break;
+                    case 1:
+                        wall = wallPrefabs[1];
+                        rotation = new Vector3(0, 0, 0);
+                        break;
+                    case 2:
+                        wall = wallPrefabs[1];
+                        rotation = new Vector3(0, -90, 0);
+                        break;
+                    case 3:
+                        wall = wallPrefabs[2];
+                        rotation = new Vector3(0, 0, 0);
+                        break;
+                    case 4:
+                        wall = wallPrefabs[1];
+                        rotation = new Vector3(0, 180, 0);
+                        break;
+                    case 5:
+                        wall = wallPrefabs[2];
+                        rotation = new Vector3(0, 0, 0);
+                        break;
+                    case 6:
+                        wall = wallPrefabs[2];
+                        rotation = new Vector3(0, -90, 0);
+                        break;
+                    case 7:
+                        wall = wallPrefabs[3];
+                        rotation = new Vector3(0, -90, 0);
+                        break;
+                    case 8:
+                        wall = wallPrefabs[1];
+                        rotation = new Vector3(0, 90, 0);
+                        break;
+                    case 9:
+                        wall = wallPrefabs[2];
+                        rotation = new Vector3(0, 90, 0);
+                        break;
+                    case 10:
+                        wall = wallPrefabs[2];
+                        rotation = new Vector3(0, 0, 0);
+                        break;
+                    case 11:
+                        wall = wallPrefabs[3];
+                        rotation = new Vector3(0, 0, 0);
+                        break;
+                    case 12:
+                        wall = wallPrefabs[2];
+                        rotation = new Vector3(0, 180, 0);
+                        break;
+                    case 13:
+                        wall = wallPrefabs[3];
+                        rotation = new Vector3(0, 90, 0);
+                        break;
+                    case 14:
+                        wall = wallPrefabs[3];
+                        rotation = new Vector3(0, 180, 0);
+                        break;
+                    case 15:
+                        wall = wallPrefabs[0];
+                        rotation = new Vector3(0, 0, 0);
+                        break;
+                }
+                Debug.Log(rotation);
+                GameObject prefab = Instantiate(wall, new Vector3(j + 1f, 0, i + 1f), Quaternion.identity);
+                Instantiate(wallPrefabs[0], new Vector3(j + 1f, 0, i + 1f), Quaternion.identity);
+                Debug.Log(binaryTileMap[i, j]);
+                prefab.transform.localEulerAngles = rotation;
+                yield return new WaitForSeconds(0.0f);
+            }
+        }
+        #endregion
     }
+    //Room splitting
     public bool CanSplitRoom(RectInt currentRoom, Queue<RectInt> q, HashSet<RectInt> discovered)
     {
         //Splits the room if it hit the end of the next level.
@@ -337,6 +453,8 @@ public class DungeonGenerator : MonoBehaviour
 
         return nextRoomArray;
     }
+
+    //sorting rooms
     private void BubbleSorter(List<RectInt> rooms, SortingType type)
     {
         for (int i = rooms.Count - 2; i >= 0; i--)
@@ -367,6 +485,7 @@ public class DungeonGenerator : MonoBehaviour
         }
     }
 
+    //Adding Doors
     public bool CanAddDoor(RectInt roomA, RectInt roomB)
     {
         if (roomA != roomB)
@@ -382,39 +501,6 @@ public class DungeonGenerator : MonoBehaviour
         return false;
     }
     public RectInt AddDoors(RectInt currentRoom, RectInt overlappingRoom)
-    {
-        RectInt wall = AlgorithmsUtils.Intersect(currentRoom, overlappingRoom);
-
-        if (wall.width > wall.height)
-        {
-            //horizontal
-            if (wall.width < doorWidth + wallMargin * 2)
-            {
-                return RectInt.zero;
-            }
-
-            wall = new RectInt(wall.x + wallMargin, wall.y, wall.width - wallMargin * 2, wall.height);
-
-            int randomX = Random.Range(wall.xMin, wall.xMax - 1);
-
-            return new RectInt(randomX, wall.y, doorWidth, wall.height);
-        }
-        else
-        {
-            //vertical
-            if (wall.height < doorWidth + wallMargin * 2)
-            {
-                return RectInt.zero;
-            }
-            wall = new RectInt(wall.x , wall.y + wallMargin, wall.width , wall.height - wallMargin * 2);
-
-            int randomY = Random.Range(wall.yMin, wall.yMax - 1);
-
-            return new RectInt(wall.x, randomY, wall.width , doorWidth);
-        }
-    }
-
-    public RectInt AddDoors2(RectInt currentRoom, RectInt overlappingRoom)
     {
         RectInt wall = AlgorithmsUtils.Intersect(currentRoom, overlappingRoom);
 
@@ -437,7 +523,6 @@ public class DungeonGenerator : MonoBehaviour
             return new RectInt(wall.x, randomY, wall.width, doorWidth);
         }
     }
-
     private void AddRoomConnection(RectInt currentDoor, RectInt[] connectedRooms)
     {
         if (!doorConnections.ContainsKey(currentDoor))
@@ -458,7 +543,6 @@ public class DungeonGenerator : MonoBehaviour
         roomConnections[connectedRooms[0]].Add(currentDoor);
         roomConnections[connectedRooms[1]].Add(currentDoor);
     }
-
     private bool ContainsRoomConnection(RectInt roomA, RectInt roomB)
     {
         //if room connections has the key room
@@ -524,10 +608,113 @@ public class DungeonGenerator : MonoBehaviour
         return false;
     }
 
+    //Node Graph
     private Vector3 GetCenter(RectInt target)
     {
         float x = target.xMin + (float)(target.xMax - target.xMin) / 2;
         float y = target.yMin + (float)(target.yMax - target.yMin) / 2; 
         return new Vector3(x, 0, y) ;
+    }
+
+    //Visuals
+    /*[Button]
+    public void SpawnDungeonAssets()
+    {
+        HashSet<Vector2Int> walls = new HashSet<Vector2Int>();
+        HashSet<Vector2Int> doories = new HashSet<Vector2Int>();
+        Vector3 currentPos;
+        GameObject wallParent = new GameObject("Walls Parent");
+        GameObject floorParent = new GameObject("Floor Parent");
+
+        for (int i = 0; i < doors.Count; i++)
+        {
+            if (doors[i].width > 1 )
+            {
+                for (int j = 0; j < doors[i].width; j++)
+                {
+                    doories.Add(new Vector2Int(doors[i].x + j, doors[i].y));
+                }
+            }
+            else if(doors[i].height > 1)
+            {
+                for (int j = 0; j < doors[i].height; j++)
+                {
+                    doories.Add(new Vector2Int(doors[i].x, doors[i].y + j));
+                }
+            }
+        }
+
+        foreach (var room in createdRooms)
+        {
+            currentPos = new Vector3(room.position.x + offset.x, 0 + offset.y, room.position.y + offset.z);
+            for (int i = 0; i < 2; i++)
+            {
+                for (int j = 0; j < room.width; j++)
+                {
+                    if (!ContainsBorder(currentPos, walls, doories))
+                    {
+                        GameObject lol = Instantiate(wallPrefabs, currentPos, Quaternion.identity, wallParent.transform);
+                        walls.Add(new Vector2Int((int)(lol.transform.position.x - offset.x), (int)(lol.transform.position.z - offset.z)));
+                    }
+                    currentPos = new Vector3(currentPos.x += 1, currentPos.y, currentPos.z);
+                }
+                currentPos = new Vector3(room.position.x + offset.x, 0 + offset.y, room.position.y + offset.z + room.height - 1);
+            }
+
+            currentPos = new Vector3(room.position.x + offset.x, 0 + offset.y, room.position.y + offset.z + 1);
+            for (int i = 0; i < 2; i++)
+            {
+                for (int j = 0; j < room.height - 1; j++)
+                {
+                    if (!ContainsBorder(currentPos, walls, doories))
+                    {
+                        GameObject lol = Instantiate(wallPrefabs, currentPos, Quaternion.identity, wallParent.transform);
+                        walls.Add(new Vector2Int((int)(lol.transform.position.x - offset.x), (int)(lol.transform.position.z - offset.z)));
+                    }
+                    currentPos = new Vector3(currentPos.x, currentPos.y, currentPos.z += 1);
+                }
+                currentPos = new Vector3(room.position.x + offset.x + room.width - 1, 0 + offset.y, room.position.y + offset.z);
+            }
+        }
+
+
+        //spawn wall. 1st one is always a default
+        //after spawning the next well, check the surrounding walls.
+        //if wall is touching another wall. Change the current one to one that attaches to that wall.
+        //then change neighbouring wall into the appropiate wall.
+    }*/
+    //
+
+    private bool ContainsBorder(Vector3 position, HashSet<Vector2Int> walls, HashSet<Vector2Int> doories)
+    {
+        Vector2Int wallPosition = new Vector2Int((int)(position.x - offset.x), (int)(position.z - offset.z));
+        if (doories.Contains(wallPosition) || walls.Contains(wallPosition))
+        {
+            return true;
+        }
+        return false;
+    }
+
+    public void ConvertToBinary(int[,] tilemap)
+    {
+        binaryTileMap = new int[tilemap.GetLength(0) - 1, tilemap.GetLength(1) - 1];
+        //y
+        for (int i = 0; i < binaryTileMap.GetLength(0); i++)
+        {
+            //x 
+            for (int j = 0; j < binaryTileMap.GetLength(1); j++)
+            {
+                binaryTileMap[i, j] = binaryTileMap[i, j] * 1 +
+                   binaryTileMap[i, j + 1] * 2 +
+                   binaryTileMap[i + 1, j + 1] * 4 +
+                   binaryTileMap[i + 1, j] * 8;
+
+                //get the 4 squares around this position
+                //int topLeft = j,i;
+                //int topRight = j,i + 1;
+                //int bottomRight = j - 1, i + 1;
+                //int bottomLeft = j - 1, i;
+            }
+        }
     }
 }
