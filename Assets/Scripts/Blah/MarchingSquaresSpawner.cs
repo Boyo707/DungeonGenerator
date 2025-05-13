@@ -8,7 +8,7 @@ using UnityEngine.Rendering;
 
 public class MarchingSquaresSpawner : MonoBehaviour
 {
-    private TileMapGenerator _generator;
+    //private TileMapGenerator _generator;
 
     [SerializeField] private GameObject[] walls;
 
@@ -23,7 +23,7 @@ public class MarchingSquaresSpawner : MonoBehaviour
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        _generator = GetComponent<TileMapGenerator>();
+        //_generator = GetComponent<TileMapGenerator>();
     }
 
     // Update is called once per frame
@@ -40,7 +40,7 @@ public class MarchingSquaresSpawner : MonoBehaviour
     [Button]
     public void ConvertToBinary()
     {
-        currentTilemap = _generator.GetTileMap();
+        //currentTilemap = _generator.GetTileMap();
 
         binaryTile = new int[currentTilemap.GetLength(0) - 1, currentTilemap.GetLength(1) - 1];
 

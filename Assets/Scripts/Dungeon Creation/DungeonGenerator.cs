@@ -262,13 +262,6 @@ public class DungeonGenerator : MonoBehaviour
             //x
             for (int j = 0; j < binaryTileMap.GetLength(1); j++)
             {
-                //Debug.Log(binaryTile[i, j]);
-                //walls 0 = empty
-                //walls 1 = wall end
-                //walls 2 = wall    
-                //walls 3 = wall corner
-
-
                 GameObject wall = gameObject;
                 Vector3 rotation = Vector3.zero;
 
@@ -339,12 +332,13 @@ public class DungeonGenerator : MonoBehaviour
                         rotation = new Vector3(0, 0, 0);
                         break;
                 }
-                Debug.Log(rotation);
+
                 GameObject prefab = Instantiate(wall, new Vector3(j + 1f, 0, i + 1f), Quaternion.identity);
-                Instantiate(wallPrefabs[0], new Vector3(j + 1f, 0, i + 1f), Quaternion.identity);
-                Debug.Log(binaryTileMap[i, j]);
                 prefab.transform.localEulerAngles = rotation;
-                yield return new WaitForSeconds(0.0f);
+
+                Instantiate(wallPrefabs[0], new Vector3(j + 1f, 0, i + 1f), Quaternion.identity);
+
+                //yield return new WaitForSeconds(0);
             }
         }
         #endregion
@@ -697,17 +691,19 @@ public class DungeonGenerator : MonoBehaviour
 
     public void ConvertToBinary(int[,] tilemap)
     {
+        Debug.Log(tilemap.GetLength(0));
         binaryTileMap = new int[tilemap.GetLength(0) - 1, tilemap.GetLength(1) - 1];
+        Debug.Log(binaryTileMap.GetLength(0));
         //y
-        for (int i = 0; i < binaryTileMap.GetLength(0); i++)
+        for (int i = 0; i < tilemap.GetLength(0) - 1; i++)
         {
             //x 
-            for (int j = 0; j < binaryTileMap.GetLength(1); j++)
+            for (int j = 0; j < tilemap.GetLength(1) - 1; j++)
             {
-                binaryTileMap[i, j] = binaryTileMap[i, j] * 1 +
-                   binaryTileMap[i, j + 1] * 2 +
-                   binaryTileMap[i + 1, j + 1] * 4 +
-                   binaryTileMap[i + 1, j] * 8;
+                binaryTileMap[i, j] = tilemap[i, j] * 1 +
+                   tilemap[i, j + 1] * 2 +
+                   tilemap[i + 1, j + 1] * 4 +
+                   tilemap[i + 1, j] * 8;
 
                 //get the 4 squares around this position
                 //int topLeft = j,i;
