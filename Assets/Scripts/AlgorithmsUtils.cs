@@ -28,7 +28,7 @@ public class AlgorithmsUtils
         }
     }
     
-    public static void FillRectangle(char[,] array, RectInt area, char value)
+    public static void FillRectangle(int[,] array, RectInt area, int value)
     {
         for (int i = area.y; i < area.y + area.height; i++)
         {

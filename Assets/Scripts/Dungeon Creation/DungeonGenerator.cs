@@ -1,8 +1,13 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
-using UnityEditor;
 using NaughtyAttributes;
+using System.Linq;
+using Unity.VisualScripting;
+using UnityEditor.MemoryProfiler;
+using UnityEditor.Experimental.GraphView;
+using System.Text;
+using UnityEngine.Tilemaps;
 
 public enum SortingType
 {
@@ -28,6 +33,12 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField] private bool showRooms;
     [SerializeField] private bool showDoors;
     [SerializeField] private bool showGraph;
+    [SerializeField] private bool playRooms;
+    [SerializeField] private bool playSorter;
+    [SerializeField] private bool playDoorGraph;
+    [SerializeField] private bool playVisuals;
+    [SerializeField] private bool playGraphStep = false;
+    
 
     [Header("Visuals")]
     [SerializeField] private Vector3 offset;
@@ -37,12 +48,16 @@ public class DungeonGenerator : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private List<RectInt> createdRooms = new();
     [SerializeField] private List<RectInt> doors = new();
+    [SerializeField] private List<RectInt> connections = new();
     //key = door, value is connection
+    private Dictionary<RectInt, List<RectInt>> roomAdjacencyList = new();
+
     [SerializeField] private Dictionary<RectInt, List<RectInt>> doorConnections = new();
     [SerializeField] private Dictionary<RectInt, List<RectInt>> roomConnections = new();
 
     //maybe instead of an int you set the color in the dictionary.
     //you can set the color in a function withing the adding color part.
+
     private Dictionary<RectInt, int> roomData = new();
 
     private List<Color> drawColors = new();
@@ -57,22 +72,25 @@ public class DungeonGenerator : MonoBehaviour
     private int a = 0;
     private int roomDeduction = 0;
 
+    private int[,] tileMap;
     private int[,] binaryTileMap;
+
+    private bool continueThingy = false;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
+        minRoomSize += wallMargin;
+
         Debug.Log(totalDungeonSize.xMin);
         Debug.Log(totalDungeonSize.xMax);
-        if(dungeonSeed != 0)
-        {
-            Random.InitState(dungeonSeed);
-        }
-        else
+        if(dungeonSeed == 0)
         {
             dungeonSeed = Random.seed;
-            Debug.Log(Random.seed);
+            Random.InitState(dungeonSeed);
         }
+
+        Random.InitState(dungeonSeed);
 
         minRoomSize += wallMargin;
         
@@ -133,6 +151,7 @@ public class DungeonGenerator : MonoBehaviour
 
     IEnumerator Generation(RectInt room)
     {
+        yield return new WaitUntil(() => playRooms);
         #region Rooms Splitting
         //rooms splitting
 
@@ -176,6 +195,7 @@ public class DungeonGenerator : MonoBehaviour
         }
         #endregion
 
+        yield return new WaitUntil(() => playSorter);
         #region Remove 10%
         //remove 10% of the smallest rooms
         BubbleSorter(createdRooms, SortingType.Size);
@@ -190,64 +210,89 @@ public class DungeonGenerator : MonoBehaviour
 
         BubbleSorter(createdRooms, SortingType.Position);
 
+        yield return new WaitUntil(() => playDoorGraph);
+
         #region Door Creation
+        
         Stack<RectInt> stackRooms = new();
         HashSet<RectInt> Discovered = new HashSet<RectInt>();
 
         stackRooms.Push(createdRooms[0]);
 
-        RectInt[] previousRooms = new RectInt[2];
-
         while (stackRooms.Count > 0)
         {
+            Debug.Log("START ========================================");
             RectInt current = stackRooms.Pop();
 
-            Debug.Log(current);
-
-            Debug.Log("length is " + previousRooms.Length);
-            Debug.Log("Contains a connection is " + !ContainsRoomConnection(previousRooms[0], previousRooms[1]));
-
-            //without Contains it will create multiple doors. 
-            //find a way to solve this
-            if(previousRooms.Length != 0 && !ContainsRoomConnection(previousRooms[0], previousRooms[1]))
-            {
-                Debug.Log("created door between " + previousRooms[0] + "\nand " + previousRooms[1]);
-                RectInt door = AddDoors(previousRooms[0], previousRooms[1]);
-                doors.Add(door);
-                
-                AddRoomConnection(door, previousRooms);
-                yield return new WaitForSeconds(pauseTime);
-                yield return new WaitUntil(() => !pauseGeneration);
-
-            }
+            AddRoom(current);
+            Debug.Log("Current " + current);
 
             if (!Discovered.Contains(current))
             {
-                //Debug.Log("has not been discovered");
+                Debug.Log("not discovered");
+                foreach (RectInt neighbour in GetNeighbours(current))
+                {
+                    Debug.Log(GetNeighbours(neighbour).Count);
+                    if (Discovered.Contains(neighbour))
+                    {
+                        //CURRENT AND NEIGHBOUR CAN BE CNNECTED
+                        Debug.Log("created connection");
+                        RectInt door = AddDoors(neighbour, current);
+                        doors.Add(door);
+
+                        RectInt[] roomCon = { neighbour, current };
+                        connections.Add(neighbour);
+                        connections.Add(current);
+                        AddRoomConnection(door, roomCon);
+                    }
+                    
+                }
+                
+
                 Discovered.Add(current);
 
+                Debug.Log("Find neighbours");
+                //find neighbours
                 foreach (RectInt node in createdRooms)
                 {
-                    if(CanAddDoor(current, node) && !discovered.Contains(node) && !ContainsRoomConnection(current, node))
+                    if (CanAddDoor(current, node) && !Discovered.Contains(node) && !roomAdjacencyList.ContainsKey(node) )
                     {
-                        Debug.Log("current " + current);
-                        Debug.Log("Next " + node);
-                        previousRooms[0] = current;
-                        previousRooms[1] = node;
-                        stackRooms.Push(node);
+                        //create neighbour
+                        Debug.Log("created neighbour");
+                        AddEdge(current, node);
                     }
                 }
+
+                foreach (RectInt node in GetNeighbours(current))
+                {
+                    Debug.Log("pushing Nodes");
+                    stackRooms.Push(node);
+                }
+                    
+                Debug.Log("END [][][[][][][][[][[]]][[][][][][][[][[][][][][][][]");
+                yield return new WaitForSeconds(pauseTime);
+
             }
         }
         #endregion
 
+        yield return new WaitUntil(() => playVisuals);
+
         #region Visuals
-        int[,] tileMap = new int[totalDungeonSize.height, totalDungeonSize.width];
+        tileMap = new int[totalDungeonSize.height, totalDungeonSize.width];
 
         foreach (var rooming in createdRooms)
         {
+            foreach(var intersectRoom in createdRooms)
+            {
+                if (rooming != intersectRoom)
+                {
+                    AlgorithmsUtils.FillRectangle(tileMap, AlgorithmsUtils.Intersect(rooming, intersectRoom), 1);
+                }
+            }
             AlgorithmsUtils.FillRectangleOutline(tileMap, rooming, 1);
         }
+
 
         foreach (var door in doors)
         {
@@ -268,9 +313,7 @@ public class DungeonGenerator : MonoBehaviour
                 switch (binaryTileMap[i, j])
                 {
                     case 0:
-                        wall = wallPrefabs[0];
-                        rotation = new Vector3(0, 0, 0);
-                        break;
+                        continue;
                     case 1:
                         wall = wallPrefabs[1];
                         rotation = new Vector3(0, 0, 0);
@@ -328,18 +371,49 @@ public class DungeonGenerator : MonoBehaviour
                         rotation = new Vector3(0, 180, 0);
                         break;
                     case 15:
-                        wall = wallPrefabs[0];
-                        rotation = new Vector3(0, 0, 0);
-                        break;
+                        continue;
                 }
 
                 GameObject prefab = Instantiate(wall, new Vector3(j + 1f, 0, i + 1f), Quaternion.identity);
                 prefab.transform.localEulerAngles = rotation;
-
-                Instantiate(wallPrefabs[0], new Vector3(j + 1f, 0, i + 1f), Quaternion.identity);
-
-                //yield return new WaitForSeconds(0);
             }
+        }
+        
+        Queue<Vector2Int> FloorQueue = new();
+        HashSet<Vector2Int> floorDiscovered = new();
+
+
+        int loop = 0;
+
+        FloorQueue.Enqueue(new Vector2Int(createdRooms[0].y + 1, createdRooms[0].x + 1));
+
+        while (FloorQueue.Count > 0)
+        {
+            Vector2Int current = FloorQueue.Dequeue();
+            Debug.Log(current);
+            floorDiscovered.Add(current);
+
+
+            GameObject objec = Instantiate(wallPrefabs[0], new Vector3(current.y + 0.5f, 0, current.x + 0.5f), Quaternion.identity);
+            objec.name = $"{current.x}, {current.y}";
+            
+
+            yield return new WaitForSeconds(0);
+
+            foreach (Vector2Int tile in GetTileMapNeighbours(tileMap, current))
+            {
+                Debug.Log(!floorDiscovered.Contains(tile));
+                Debug.Log(!FloorQueue.Contains(tile));
+                Debug.Log(isValidIndex(tileMap[current.x, current.y]));
+                if (!floorDiscovered.Contains(tile) && !FloorQueue.Contains(tile) && isValidIndex(tileMap[current.x, current.y]))
+                {
+                    Debug.Log(tile + "ADDING TO QUE " + loop);
+                    FloorQueue.Enqueue(tile);
+                }
+               
+            }
+            loop++;
+            Debug.Log("End WHILE LOOP -=-==-==-=-=-=--=-");
         }
         #endregion
     }
@@ -485,8 +559,9 @@ public class DungeonGenerator : MonoBehaviour
         if (roomA != roomB)
         {
             RectInt intersection = AlgorithmsUtils.Intersect(roomA, roomB);
-            int minArea = doorWidth * (wallMargin * 2);
+            int minArea = (doorWidth + wallMargin * 2) * 2;
             int area = intersection.width * intersection.height;
+
             if (area > minArea)
             {
                 return true;
@@ -501,7 +576,8 @@ public class DungeonGenerator : MonoBehaviour
         if (wall.width > wall.height)
         {
             //horizontal
-            wall = new RectInt(wall.x + wallMargin, wall.y, wall.width - wallMargin * 2, wall.height);
+            wall.x += wallMargin;
+            wall.width -= wallMargin * 2;
 
             int randomX = Random.Range(wall.xMin, wall.xMax - 1);
 
@@ -510,12 +586,14 @@ public class DungeonGenerator : MonoBehaviour
         else
         {
             //vertical
-            wall = new RectInt(wall.x, wall.y + wallMargin, wall.width, wall.height - wallMargin * 2);
+            wall.y += wallMargin;
+            wall.height -= wallMargin * 2;
 
             int randomY = Random.Range(wall.yMin, wall.yMax - 1);
 
             return new RectInt(wall.x, randomY, wall.width, doorWidth);
         }
+
     }
     private void AddRoomConnection(RectInt currentDoor, RectInt[] connectedRooms)
     {
@@ -537,69 +615,31 @@ public class DungeonGenerator : MonoBehaviour
         roomConnections[connectedRooms[0]].Add(currentDoor);
         roomConnections[connectedRooms[1]].Add(currentDoor);
     }
-    private bool ContainsRoomConnection(RectInt roomA, RectInt roomB)
+
+    private List<RectInt> GetNeighbours(RectInt currentRoom)
     {
-        //if room connections has the key room
-        if (roomConnections.ContainsKey(roomA))
-        {
-            //through each door connected to the room(s)
-            foreach (var door in roomConnections[roomA])
-            {
-                //for all the rooms connected to the door
-                foreach (var room in doorConnections[door])
-                {
-                    if(room == roomB)
-                    {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
+        return new List<RectInt>(roomAdjacencyList[currentRoom]);
     }
-    private bool HasConnection(RectInt target, RectInt except)
+    public void AddRoom(RectInt node)
     {
-        if (roomConnections.ContainsKey(target))
+        if (!roomAdjacencyList.ContainsKey(node))
         {
-            foreach (var item in roomConnections[target])
-            {
-                if(item != except)
-                {
-                    return true;
-                }
-            }
+            roomAdjacencyList[node] = new List<RectInt>();
         }
-        else if (doorConnections.ContainsKey(target))
-        {
-            foreach (var item in doorConnections[target])
-            {
-                if (item != except)
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
-    private bool ContainsDoorConnection(RectInt doorA, RectInt doorB)
+    public void AddEdge(RectInt fromNode, RectInt toNode)
     {
-        //if room connections has the key room
-        if (doorConnections.ContainsKey(doorA))
+        if (!roomAdjacencyList.ContainsKey(fromNode))
         {
-            //through each door connected to the room(s)
-            foreach (var room in doorConnections[doorA])
-            {
-                //for all the rooms connected to the door
-                foreach (var door in roomConnections[room])
-                {
-                    if (room == doorB)
-                    {
-                        return true;
-                    }
-                }
-            }
+            AddRoom(fromNode);
         }
-        return false;
+        if (!roomAdjacencyList.ContainsKey(toNode))
+        {
+            AddRoom(toNode);
+        }
+
+        roomAdjacencyList[fromNode].Add(toNode);
+        roomAdjacencyList[toNode].Add(fromNode);
     }
 
     //Node Graph
@@ -608,85 +648,6 @@ public class DungeonGenerator : MonoBehaviour
         float x = target.xMin + (float)(target.xMax - target.xMin) / 2;
         float y = target.yMin + (float)(target.yMax - target.yMin) / 2; 
         return new Vector3(x, 0, y) ;
-    }
-
-    //Visuals
-    /*[Button]
-    public void SpawnDungeonAssets()
-    {
-        HashSet<Vector2Int> walls = new HashSet<Vector2Int>();
-        HashSet<Vector2Int> doories = new HashSet<Vector2Int>();
-        Vector3 currentPos;
-        GameObject wallParent = new GameObject("Walls Parent");
-        GameObject floorParent = new GameObject("Floor Parent");
-
-        for (int i = 0; i < doors.Count; i++)
-        {
-            if (doors[i].width > 1 )
-            {
-                for (int j = 0; j < doors[i].width; j++)
-                {
-                    doories.Add(new Vector2Int(doors[i].x + j, doors[i].y));
-                }
-            }
-            else if(doors[i].height > 1)
-            {
-                for (int j = 0; j < doors[i].height; j++)
-                {
-                    doories.Add(new Vector2Int(doors[i].x, doors[i].y + j));
-                }
-            }
-        }
-
-        foreach (var room in createdRooms)
-        {
-            currentPos = new Vector3(room.position.x + offset.x, 0 + offset.y, room.position.y + offset.z);
-            for (int i = 0; i < 2; i++)
-            {
-                for (int j = 0; j < room.width; j++)
-                {
-                    if (!ContainsBorder(currentPos, walls, doories))
-                    {
-                        GameObject lol = Instantiate(wallPrefabs, currentPos, Quaternion.identity, wallParent.transform);
-                        walls.Add(new Vector2Int((int)(lol.transform.position.x - offset.x), (int)(lol.transform.position.z - offset.z)));
-                    }
-                    currentPos = new Vector3(currentPos.x += 1, currentPos.y, currentPos.z);
-                }
-                currentPos = new Vector3(room.position.x + offset.x, 0 + offset.y, room.position.y + offset.z + room.height - 1);
-            }
-
-            currentPos = new Vector3(room.position.x + offset.x, 0 + offset.y, room.position.y + offset.z + 1);
-            for (int i = 0; i < 2; i++)
-            {
-                for (int j = 0; j < room.height - 1; j++)
-                {
-                    if (!ContainsBorder(currentPos, walls, doories))
-                    {
-                        GameObject lol = Instantiate(wallPrefabs, currentPos, Quaternion.identity, wallParent.transform);
-                        walls.Add(new Vector2Int((int)(lol.transform.position.x - offset.x), (int)(lol.transform.position.z - offset.z)));
-                    }
-                    currentPos = new Vector3(currentPos.x, currentPos.y, currentPos.z += 1);
-                }
-                currentPos = new Vector3(room.position.x + offset.x + room.width - 1, 0 + offset.y, room.position.y + offset.z);
-            }
-        }
-
-
-        //spawn wall. 1st one is always a default
-        //after spawning the next well, check the surrounding walls.
-        //if wall is touching another wall. Change the current one to one that attaches to that wall.
-        //then change neighbouring wall into the appropiate wall.
-    }*/
-    //
-
-    private bool ContainsBorder(Vector3 position, HashSet<Vector2Int> walls, HashSet<Vector2Int> doories)
-    {
-        Vector2Int wallPosition = new Vector2Int((int)(position.x - offset.x), (int)(position.z - offset.z));
-        if (doories.Contains(wallPosition) || walls.Contains(wallPosition))
-        {
-            return true;
-        }
-        return false;
     }
 
     public void ConvertToBinary(int[,] tilemap)
@@ -704,13 +665,86 @@ public class DungeonGenerator : MonoBehaviour
                    tilemap[i, j + 1] * 2 +
                    tilemap[i + 1, j + 1] * 4 +
                    tilemap[i + 1, j] * 8;
-
-                //get the 4 squares around this position
-                //int topLeft = j,i;
-                //int topRight = j,i + 1;
-                //int bottomRight = j - 1, i + 1;
-                //int bottomLeft = j - 1, i;
             }
         }
+    }
+
+    public bool isValidIndex(int newIndex)
+    {
+        return newIndex == 0;
+    }
+
+    public List<Vector2Int> GetTileMapNeighbours(int[,] tileMap, Vector2Int tileMapPos)
+    {
+        List<Vector2Int> neighbours = new();
+
+        Debug.Log("creating neighbour");
+
+        Debug.Log(tileMap.GetLength(0));
+        Debug.Log(tileMap.GetLength(1));
+        int yMin = Mathf.Clamp(tileMapPos.x - 1, 0, tileMap.GetLength(0));
+        //int yMin = tileMapPos.y - 1;
+        int yMax = Mathf.Clamp(tileMapPos.x + 1, 0 , tileMap.GetLength(0));
+        //int yMax = tileMapPos.y + 1;
+        Debug.Log("y but actually x is " +yMin + " : " + tileMapPos.y + " : " + yMax);
+
+
+        int xMin = Mathf.Clamp(tileMapPos.y - 1,0, tileMap.GetLength(1));
+        //int xMin = tileMapPos.x - 1;
+        int xMax = Mathf.Clamp(tileMapPos.y + 1,0, tileMap.GetLength(1));
+        //int xMax = tileMapPos.x + 1;
+        Debug.Log("x but actually y is " + xMin + " : " + tileMapPos.x + " : " + xMax);
+
+
+        //y
+        for (int i = yMin; i <= yMax; i++)
+        {
+            //x
+            for (int j = xMin; j <= xMax; j++)
+            {
+                //Debug.Log(new Vector2Int(i, j) + "  Found Position: " + tileMap[i,j]);
+                neighbours.Add(new Vector2Int(i, j));
+            }
+        }
+
+        Debug.Log("reached the end");
+        return neighbours;
+    }
+
+    public string ToString(bool flip, int[,] tilemap)
+    {
+        if (tilemap == null) return "Tile map not generated yet.";
+
+        int rows = tilemap.GetLength(0);
+        int cols = tilemap.GetLength(1);
+
+        var sb = new StringBuilder();
+
+        int start = flip ? rows - 1 : 0;
+        int end = flip ? -1 : rows;
+        int step = flip ? -1 : 1;
+
+        for (int i = start; i != end; i += step)
+        {
+            for (int j = 0; j < cols; j++)
+            {
+                sb.Append((tilemap[i, j] == 0 ? '0' : '#')); //Replaces 1 with '#' making it easier to visualize
+            }
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
+    }
+
+    [Button]
+    public void Lol()
+    {
+        continueThingy = false;
+    }
+
+    [Button]
+    public void PrintTileMap(int[,] tilemap)
+    {
+        Debug.Log(ToString(true, tilemap));
     }
 }

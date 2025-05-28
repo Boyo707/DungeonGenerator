@@ -168,18 +168,23 @@ MonoBehaviour:
     y: 0
     width: 100
     height: 100
-  splitDepth: 8
+  splitDepth: 9
   minRoomSize: 5
-  wallHeight: 3
-  wallMargin: 1
+  wallHeight: 5
+  wallMargin: 4
   doorWidth: 2
-  dungeonSeed: 25
+  dungeonSeed: 0
   generateOnStart: 1
   pauseTime: 0
   pauseGeneration: 0
   showRooms: 1
   showDoors: 1
   showGraph: 1
+  playRooms: 1
+  playSorter: 1
+  playDoorGraph: 1
+  playVisuals: 1
+  playGraphStep: 0
   offset: {x: 0.5, y: 0.5, z: 0.5}
   wallPrefabs:
   - {fileID: 3204687337251383887, guid: ee2ec93b0f8db314d99c5c4ca581bc18, type: 3}
@@ -188,6 +193,7 @@ MonoBehaviour:
   - {fileID: 1040310750116940119, guid: b691f74e537589c45b55947cb8bfa721, type: 3}
   createdRooms: []
   doors: []
+  connections: []
 --- !u!1 &330585543
 GameObject:
   m_ObjectHideFlags: 0
