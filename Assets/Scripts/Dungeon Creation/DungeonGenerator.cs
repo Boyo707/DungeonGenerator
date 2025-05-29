@@ -38,7 +38,7 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField] private GameObject[] wallPrefabs;
 
     [Header("Playability")]
-    [SerializeField] private NavMeshSurface navMeshSurface;
+    private PathFinder pathFinder;
 
     [Header("Debug")]
     [SerializeField] private List<RectInt> createdRooms = new();
@@ -80,6 +80,11 @@ public class DungeonGenerator : MonoBehaviour
 
     private int[,] tileMap;
     private int[,] binaryTileMap;
+
+    public int[,] TileMap
+    {
+        get { return tileMap; }
+    }
 
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
@@ -430,10 +435,10 @@ public class DungeonGenerator : MonoBehaviour
         yield return new WaitUntil(() => continueStep || instantGeneration);
         continueStep = false;
 
-        navMeshSurface.BuildNavMesh();
+        //activate playability
     }
-    
-    //Room splitting
+
+    #region RoomSplitting
     public bool CanSplitRoom(RectInt currentRoom, Queue<RectInt> q, HashSet<RectInt> discovered)
     {
         //Splits the room if it hit the end of the next level.
@@ -537,6 +542,7 @@ public class DungeonGenerator : MonoBehaviour
 
         return nextRoomArray;
     }
+    #endregion
 
     //sorting rooms
     private void BubbleSorter(List<RectInt> rooms, SortingType type)
@@ -569,6 +575,7 @@ public class DungeonGenerator : MonoBehaviour
         }
     }
 
+    #region Doors and Graph Connections
     //Adding Doors
     public bool CanAddDoor(RectInt roomA, RectInt roomB)
     {
@@ -665,12 +672,12 @@ public class DungeonGenerator : MonoBehaviour
         float y = target.yMin + (float)(target.yMax - target.yMin) / 2; 
         return new Vector3(x, 0, y) ;
     }
+    #endregion
 
+    #region SquareMarching
     public void ConvertToBinary(int[,] tilemap)
     {
-        Debug.Log(tilemap.GetLength(0));
         binaryTileMap = new int[tilemap.GetLength(0) - 1, tilemap.GetLength(1) - 1];
-        Debug.Log(binaryTileMap.GetLength(0));
         //y
         for (int i = 0; i < tilemap.GetLength(0) - 1; i++)
         {
@@ -694,22 +701,17 @@ public class DungeonGenerator : MonoBehaviour
     {
         List<Vector2Int> neighbours = new();
 
-        Debug.Log("creating neighbour");
 
-        Debug.Log(tileMap.GetLength(0));
-        Debug.Log(tileMap.GetLength(1));
         int yMin = Mathf.Clamp(tileMapPos.x - 1, 0, tileMap.GetLength(0));
         //int yMin = tileMapPos.y - 1;
         int yMax = Mathf.Clamp(tileMapPos.x + 1, 0 , tileMap.GetLength(0));
         //int yMax = tileMapPos.y + 1;
-        Debug.Log("y but actually x is " +yMin + " : " + tileMapPos.y + " : " + yMax);
 
 
         int xMin = Mathf.Clamp(tileMapPos.y - 1,0, tileMap.GetLength(1));
         //int xMin = tileMapPos.x - 1;
         int xMax = Mathf.Clamp(tileMapPos.y + 1,0, tileMap.GetLength(1));
         //int xMax = tileMapPos.x + 1;
-        Debug.Log("x but actually y is " + xMin + " : " + tileMapPos.x + " : " + xMax);
 
 
         //y
@@ -723,7 +725,6 @@ public class DungeonGenerator : MonoBehaviour
             }
         }
 
-        Debug.Log("reached the end");
         return neighbours;
     }
 
@@ -751,8 +752,8 @@ public class DungeonGenerator : MonoBehaviour
 
         return sb.ToString();
     }
+    #endregion
 
-    
 
     [Button]
     public void PrintTileMap(int[,] tilemap)
