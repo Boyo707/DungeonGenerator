@@ -2,12 +2,8 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using NaughtyAttributes;
-using System.Linq;
-using Unity.VisualScripting;
-using UnityEditor.MemoryProfiler;
-using UnityEditor.Experimental.GraphView;
 using System.Text;
-using UnityEngine.Tilemaps;
+using Unity.AI.Navigation;
 
 public enum SortingType
 {
@@ -27,38 +23,48 @@ public class DungeonGenerator : MonoBehaviour
 
     [Header("Generation Settings")]
     [SerializeField] private int dungeonSeed;
-    [SerializeField] private bool generateOnStart = true;
-    [SerializeField] private float pauseTime;
-    [SerializeField] private bool pauseGeneration = false;
-    [SerializeField] private bool showRooms;
-    [SerializeField] private bool showDoors;
-    [SerializeField] private bool showGraph;
-    [SerializeField] private bool playRooms;
-    [SerializeField] private bool playSorter;
-    [SerializeField] private bool playDoorGraph;
-    [SerializeField] private bool playVisuals;
-    [SerializeField] private bool playGraphStep = false;
+    [SerializeField] private bool instantGeneration = true;
+    [SerializeField] private float stepDelay;
+    [SerializeField] private bool showRoomOutline = true;
+    [SerializeField] private bool showDoorsOutline = true;
+    [SerializeField] private bool showConnectionGraph = true;
+    [SerializeField] private bool showVisuals = true;
     
 
     [Header("Visuals")]
+    [SerializeField] private Transform wallsParent; 
+    [SerializeField] private Transform floorsParent;
     [SerializeField] private Vector3 offset;
     [SerializeField] private GameObject[] wallPrefabs;
 
+    [Header("Playability")]
+    [SerializeField] private NavMeshSurface navMeshSurface;
 
     [Header("Debug")]
     [SerializeField] private List<RectInt> createdRooms = new();
     [SerializeField] private List<RectInt> doors = new();
     [SerializeField] private List<RectInt> connections = new();
+
+    private bool continueStep = false;
+    [Button]
+    public void NextStep()
+    {
+        continueStep = true;
+    }
+
+    private bool pauseGeneration = false;
+
+    [Button]
+    public void PauseGeneration()
+    {
+        pauseGeneration = !pauseGeneration;
+    }
+
     //key = door, value is connection
     private Dictionary<RectInt, List<RectInt>> roomAdjacencyList = new();
 
-    [SerializeField] private Dictionary<RectInt, List<RectInt>> doorConnections = new();
-    [SerializeField] private Dictionary<RectInt, List<RectInt>> roomConnections = new();
-
-    //maybe instead of an int you set the color in the dictionary.
-    //you can set the color in a function withing the adding color part.
-
-    private Dictionary<RectInt, int> roomData = new();
+    private Dictionary<RectInt, List<RectInt>> doorConnections = new();
+    private Dictionary<RectInt, List<RectInt>> roomConnections = new();
 
     private List<Color> drawColors = new();
     private Color depthColor = Color.red;
@@ -75,7 +81,6 @@ public class DungeonGenerator : MonoBehaviour
     private int[,] tileMap;
     private int[,] binaryTileMap;
 
-    private bool continueThingy = false;
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
@@ -94,11 +99,7 @@ public class DungeonGenerator : MonoBehaviour
 
         minRoomSize += wallMargin;
         
-        if (generateOnStart)
-        {
-            StartCoroutine(Generation(totalDungeonSize));
-        }
-
+        StartCoroutine(Generation(totalDungeonSize));
     }
 
     // Update is called once per frame
@@ -108,7 +109,7 @@ public class DungeonGenerator : MonoBehaviour
         AlgorithmsUtils.DebugRectInt(totalDungeonSize, Color.red);
 
 
-        if (showRooms)
+        if (showRoomOutline)
         {
             for (int i = 0; i < createdRooms.Count; i++)
             {
@@ -116,20 +117,15 @@ public class DungeonGenerator : MonoBehaviour
             }
         }
 
-        if (showDoors)
+        if (showDoorsOutline)
         {
             for (int i = 0; i < doors.Count; i++)
             {
                 AlgorithmsUtils.DebugRectInt(doors[i], Color.yellow);
             }
         }
-        
-        if (!generateOnStart)
-        {
-            //Instant gen
-        }
 
-        if (showGraph)
+        if (showConnectionGraph)
         {
             foreach (var item in doorConnections)
             {
@@ -147,11 +143,13 @@ public class DungeonGenerator : MonoBehaviour
                 }
             }
         }
+
+        wallsParent.gameObject.SetActive(showVisuals);
+        floorsParent.gameObject.SetActive(showVisuals);
     }
 
     IEnumerator Generation(RectInt room)
     {
-        yield return new WaitUntil(() => playRooms);
         #region Rooms Splitting
         //rooms splitting
 
@@ -179,13 +177,15 @@ public class DungeonGenerator : MonoBehaviour
                 for (int i = 0; i < splitRooms.Length; i++)
                 {
                     Q.Enqueue(splitRooms[i]);
-                    roomData.Add(splitRooms[i],currentDepth);
                     createdRooms.Add(splitRooms[i]);
 
                     drawColors.Add(depthColor);
                     roomCounter++;
 
-                    yield return new WaitForSeconds(pauseTime);
+                    if (!instantGeneration)
+                    {
+                        yield return new WaitForSeconds(stepDelay);
+                    }
                 }
             }
             else
@@ -195,7 +195,8 @@ public class DungeonGenerator : MonoBehaviour
         }
         #endregion
 
-        yield return new WaitUntil(() => playSorter);
+        yield return new WaitUntil(() => continueStep || instantGeneration);
+        continueStep = false;
         #region Remove 10%
         //remove 10% of the smallest rooms
         BubbleSorter(createdRooms, SortingType.Size);
@@ -208,14 +209,16 @@ public class DungeonGenerator : MonoBehaviour
         }
         #endregion
 
+        //sort by position
         BubbleSorter(createdRooms, SortingType.Position);
 
-        yield return new WaitUntil(() => playDoorGraph);
+        yield return new WaitUntil(() => continueStep || instantGeneration);
+        continueStep = false;
 
         #region Door Creation
-        
+
         Stack<RectInt> stackRooms = new();
-        HashSet<RectInt> Discovered = new HashSet<RectInt>();
+        HashSet<RectInt> Discovered = new();
 
         stackRooms.Push(createdRooms[0]);
 
@@ -225,18 +228,15 @@ public class DungeonGenerator : MonoBehaviour
             RectInt current = stackRooms.Pop();
 
             AddRoom(current);
-            Debug.Log("Current " + current);
 
             if (!Discovered.Contains(current))
             {
-                Debug.Log("not discovered");
+                //Debug.Log("not discovered");
                 foreach (RectInt neighbour in GetNeighbours(current))
                 {
-                    Debug.Log(GetNeighbours(neighbour).Count);
                     if (Discovered.Contains(neighbour))
                     {
                         //CURRENT AND NEIGHBOUR CAN BE CNNECTED
-                        Debug.Log("created connection");
                         RectInt door = AddDoors(neighbour, current);
                         doors.Add(door);
 
@@ -245,38 +245,41 @@ public class DungeonGenerator : MonoBehaviour
                         connections.Add(current);
                         AddRoomConnection(door, roomCon);
                     }
+                    else
+                    {
+                        createdRooms.Remove(current);
+                    }
                     
                 }
                 
 
                 Discovered.Add(current);
 
-                Debug.Log("Find neighbours");
                 //find neighbours
                 foreach (RectInt node in createdRooms)
                 {
                     if (CanAddDoor(current, node) && !Discovered.Contains(node) && !roomAdjacencyList.ContainsKey(node) )
                     {
                         //create neighbour
-                        Debug.Log("created neighbour");
                         AddEdge(current, node);
                     }
                 }
 
                 foreach (RectInt node in GetNeighbours(current))
                 {
-                    Debug.Log("pushing Nodes");
                     stackRooms.Push(node);
                 }
                     
-                Debug.Log("END [][][[][][][][[][[]]][[][][][][][[][[][][][][][][]");
-                yield return new WaitForSeconds(pauseTime);
-
+                if (!instantGeneration)
+                {
+                    yield return new WaitForSeconds(stepDelay);
+                }
             }
         }
         #endregion
 
-        yield return new WaitUntil(() => playVisuals);
+        yield return new WaitUntil(() => continueStep || instantGeneration);
+        continueStep = false;
 
         #region Visuals
         tileMap = new int[totalDungeonSize.height, totalDungeonSize.width];
@@ -374,49 +377,62 @@ public class DungeonGenerator : MonoBehaviour
                         continue;
                 }
 
-                GameObject prefab = Instantiate(wall, new Vector3(j + 1f, 0, i + 1f), Quaternion.identity);
+                GameObject prefab = Instantiate(wall, new Vector3(j + 1f, 0, i + 1f), Quaternion.identity, wallsParent);
                 prefab.transform.localEulerAngles = rotation;
+                if (!instantGeneration)
+                {
+                    yield return new WaitForSeconds(stepDelay);
+                }
             }
         }
-        
+
+        yield return new WaitUntil(() => continueStep || instantGeneration);
+        continueStep = false;
+
         Queue<Vector2Int> FloorQueue = new();
         HashSet<Vector2Int> floorDiscovered = new();
 
 
-        int loop = 0;
 
         FloorQueue.Enqueue(new Vector2Int(createdRooms[0].y + 1, createdRooms[0].x + 1));
 
         while (FloorQueue.Count > 0)
         {
             Vector2Int current = FloorQueue.Dequeue();
-            Debug.Log(current);
+            //Debug.Log(current);
             floorDiscovered.Add(current);
 
 
-            GameObject objec = Instantiate(wallPrefabs[0], new Vector3(current.y + 0.5f, 0, current.x + 0.5f), Quaternion.identity);
+            GameObject objec = Instantiate(wallPrefabs[0], new Vector3(current.y + 0.5f, 0, current.x + 0.5f), Quaternion.identity, floorsParent);
             objec.name = $"{current.x}, {current.y}";
-            
 
-            yield return new WaitForSeconds(0);
+            if (!instantGeneration)
+            {
+                yield return new WaitForSeconds(stepDelay);
+            }
 
             foreach (Vector2Int tile in GetTileMapNeighbours(tileMap, current))
             {
-                Debug.Log(!floorDiscovered.Contains(tile));
-                Debug.Log(!FloorQueue.Contains(tile));
-                Debug.Log(isValidIndex(tileMap[current.x, current.y]));
-                if (!floorDiscovered.Contains(tile) && !FloorQueue.Contains(tile) && isValidIndex(tileMap[current.x, current.y]))
+                //Debug.Log(!floorDiscovered.Contains(tile));
+                //Debug.Log(!FloorQueue.Contains(tile));
+                //Debug.Log(isValidIndex(tileMap[current.x, current.y]));
+                if (!floorDiscovered.Contains(tile) && !FloorQueue.Contains(tile) && IsValidIndex(tileMap[current.x, current.y]))
                 {
-                    Debug.Log(tile + "ADDING TO QUE " + loop);
+                    //Debug.Log(tile + "ADDING TO QUE " + loop);
                     FloorQueue.Enqueue(tile);
                 }
                
             }
-            loop++;
-            Debug.Log("End WHILE LOOP -=-==-==-=-=-=--=-");
+            //Debug.Log("End WHILE LOOP -=-==-==-=-=-=--=-");
         }
         #endregion
+
+        yield return new WaitUntil(() => continueStep || instantGeneration);
+        continueStep = false;
+
+        navMeshSurface.BuildNavMesh();
     }
+    
     //Room splitting
     public bool CanSplitRoom(RectInt currentRoom, Queue<RectInt> q, HashSet<RectInt> discovered)
     {
@@ -498,25 +514,25 @@ public class DungeonGenerator : MonoBehaviour
         {
             int splitHeight = Random.Range(minRoomSize, currentRoom.height - minRoomSize);
 
-            Vector2Int roomSize1 = new Vector2Int(currentRoom.width, splitHeight);
-            Vector2Int roomSize2 = new Vector2Int(currentRoom.width, currentRoom.height - splitHeight);
+            Vector2Int roomSize1 = new(currentRoom.width, splitHeight);
+            Vector2Int roomSize2 = new(currentRoom.width, currentRoom.height - splitHeight);
 
             //splitA
-            nextRoomArray[0] = new RectInt(currentRoom.x, currentRoom.y, roomSize1.x, roomSize1.y + wallMargin);
+            nextRoomArray[0] = new(currentRoom.x, currentRoom.y, roomSize1.x, roomSize1.y + wallMargin);
             //top right
-            nextRoomArray[1] = new RectInt(currentRoom.x, roomSize1.y + currentRoom.y, roomSize2.x, roomSize2.y);
+            nextRoomArray[1] = new(currentRoom.x, roomSize1.y + currentRoom.y, roomSize2.x, roomSize2.y);
         }
         else
         {
             int splitLength = Random.Range(minRoomSize, currentRoom.width - minRoomSize);
 
-            Vector2Int roomSize1 = new Vector2Int(splitLength, currentRoom.height);
-            Vector2Int roomSize2 = new Vector2Int(currentRoom.width - splitLength, currentRoom.height);
+            Vector2Int roomSize1 = new(splitLength, currentRoom.height);
+            Vector2Int roomSize2 = new(currentRoom.width - splitLength, currentRoom.height);
 
             //splitA
-            nextRoomArray[0] = new RectInt(currentRoom.x, currentRoom.y, roomSize1.x + wallMargin, roomSize1.y);
+            nextRoomArray[0] = new(currentRoom.x, currentRoom.y, roomSize1.x + wallMargin, roomSize1.y);
             //top right
-            nextRoomArray[1] = new RectInt(roomSize1.x + currentRoom.x, currentRoom.y, roomSize2.x, roomSize2.y);
+            nextRoomArray[1] = new(roomSize1.x + currentRoom.x, currentRoom.y, roomSize2.x, roomSize2.y);
         }
 
         return nextRoomArray;
@@ -559,7 +575,7 @@ public class DungeonGenerator : MonoBehaviour
         if (roomA != roomB)
         {
             RectInt intersection = AlgorithmsUtils.Intersect(roomA, roomB);
-            int minArea = (doorWidth + wallMargin * 2) * 2;
+            int minArea = minRoomSize * wallMargin;
             int area = intersection.width * intersection.height;
 
             if (area > minArea)
@@ -669,7 +685,7 @@ public class DungeonGenerator : MonoBehaviour
         }
     }
 
-    public bool isValidIndex(int newIndex)
+    public bool IsValidIndex(int newIndex)
     {
         return newIndex == 0;
     }
@@ -736,11 +752,7 @@ public class DungeonGenerator : MonoBehaviour
         return sb.ToString();
     }
 
-    [Button]
-    public void Lol()
-    {
-        continueThingy = false;
-    }
+    
 
     [Button]
     public void PrintTileMap(int[,] tilemap)
