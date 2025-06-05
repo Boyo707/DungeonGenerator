@@ -14,11 +14,11 @@ public class PlayerMovement : MonoBehaviour
 
     public void GoToDestination(Vector3 destination)
     {
-        if (!isMoving)
-        {
-            StartCoroutine(FollowPathCoroutine(pathFinder.CalculatePath(transform.position, destination)));
-        }
+        StopAllCoroutines();
+        StartCoroutine(FollowPathCoroutine(pathFinder.CalculatePath(transform.position, destination)));
     }
+
+    
 
     IEnumerator FollowPathCoroutine(List<Vector3> path)
     {
@@ -30,7 +30,7 @@ public class PlayerMovement : MonoBehaviour
         isMoving = true;
         for (int i = 0; i < path.Count; i++)
         {
-            Vector3 target = path[i];
+            Vector3 target = path[i] + Vector3.up;
             // Move towards the target position
             while (Vector3.Distance(transform.position, target) > 0.1f)
             {

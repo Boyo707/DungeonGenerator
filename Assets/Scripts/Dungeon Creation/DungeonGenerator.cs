@@ -4,6 +4,8 @@ using System.Collections;
 using NaughtyAttributes;
 using System.Text;
 using Unity.AI.Navigation;
+using Unity.VisualScripting;
+using UnityEditor.Experimental.GraphView;
 
 public enum SortingType
 {
@@ -38,12 +40,14 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField] private GameObject[] wallPrefabs;
 
     [Header("Playability")]
-    private PathFinder pathFinder;
+    [SerializeField] private Transform player;
+    [SerializeField]private PathFinder pathFinder;
 
     [Header("Debug")]
     [SerializeField] private List<RectInt> createdRooms = new();
     [SerializeField] private List<RectInt> doors = new();
     [SerializeField] private List<RectInt> connections = new();
+    [SerializeField] private List<Vector3> createdFloors = new();
 
     private bool continueStep = false;
     [Button]
@@ -221,7 +225,6 @@ public class DungeonGenerator : MonoBehaviour
         continueStep = false;
 
         #region Door Creation
-
         Stack<RectInt> stackRooms = new();
         HashSet<RectInt> Discovered = new();
 
@@ -229,14 +232,12 @@ public class DungeonGenerator : MonoBehaviour
 
         while (stackRooms.Count > 0)
         {
-            Debug.Log("START ========================================");
             RectInt current = stackRooms.Pop();
 
             AddRoom(current);
 
             if (!Discovered.Contains(current))
             {
-                //Debug.Log("not discovered");
                 foreach (RectInt neighbour in GetNeighbours(current))
                 {
                     if (Discovered.Contains(neighbour))
@@ -250,14 +251,10 @@ public class DungeonGenerator : MonoBehaviour
                         connections.Add(current);
                         AddRoomConnection(door, roomCon);
                     }
-                    else
-                    {
-                        createdRooms.Remove(current);
-                    }
+                    
                     
                 }
                 
-
                 Discovered.Add(current);
 
                 //find neighbours
@@ -268,7 +265,16 @@ public class DungeonGenerator : MonoBehaviour
                         //create neighbour
                         AddEdge(current, node);
                     }
+                    
                 }
+
+                if(GetNeighbours(current).Count == 0)
+                {
+                    createdRooms.Remove(current);
+                    Debug.Log(current);
+                    stackRooms.Push(createdRooms[0]);
+                }
+                
 
                 foreach (RectInt node in GetNeighbours(current))
                 {
@@ -397,19 +403,20 @@ public class DungeonGenerator : MonoBehaviour
         Queue<Vector2Int> FloorQueue = new();
         HashSet<Vector2Int> floorDiscovered = new();
 
-
-
         FloorQueue.Enqueue(new Vector2Int(createdRooms[0].y + 1, createdRooms[0].x + 1));
 
         while (FloorQueue.Count > 0)
         {
             Vector2Int current = FloorQueue.Dequeue();
-            //Debug.Log(current);
             floorDiscovered.Add(current);
 
 
             GameObject objec = Instantiate(wallPrefabs[0], new Vector3(current.y + 0.5f, 0, current.x + 0.5f), Quaternion.identity, floorsParent);
-            objec.name = $"{current.x}, {current.y}";
+            objec.name = $"{current.x}, {current.y}, index: {tileMap[current.x, current.y]}";
+            if (TileMap[current.x, current.y] == 0)
+            {
+                createdFloors.Add(objec.transform.position);
+            }
 
             if (!instantGeneration)
             {
@@ -418,23 +425,19 @@ public class DungeonGenerator : MonoBehaviour
 
             foreach (Vector2Int tile in GetTileMapNeighbours(tileMap, current))
             {
-                //Debug.Log(!floorDiscovered.Contains(tile));
-                //Debug.Log(!FloorQueue.Contains(tile));
-                //Debug.Log(isValidIndex(tileMap[current.x, current.y]));
                 if (!floorDiscovered.Contains(tile) && !FloorQueue.Contains(tile) && IsValidIndex(tileMap[current.x, current.y]))
                 {
-                    //Debug.Log(tile + "ADDING TO QUE " + loop);
                     FloorQueue.Enqueue(tile);
                 }
-               
             }
-            //Debug.Log("End WHILE LOOP -=-==-==-=-=-=--=-");
         }
         #endregion
 
         yield return new WaitUntil(() => continueStep || instantGeneration);
         continueStep = false;
 
+        player.position = new Vector3(createdRooms[0].xMin + 1.5f, 1, createdRooms[0].yMin + 1.5f);
+        pathFinder.SetGraph(createdFloors, totalDungeonSize);
         //activate playability
     }
 
