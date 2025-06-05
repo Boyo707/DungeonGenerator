@@ -15,6 +15,7 @@ public class PlayerMovement : MonoBehaviour
     public void GoToDestination(Vector3 destination)
     {
         StopAllCoroutines();
+        Debug.Log("Helllo");
         StartCoroutine(FollowPathCoroutine(pathFinder.CalculatePath(transform.position, destination)));
     }
 
@@ -22,6 +23,7 @@ public class PlayerMovement : MonoBehaviour
 
     IEnumerator FollowPathCoroutine(List<Vector3> path)
     {
+        Debug.Log("Following");
         if (path == null || path.Count == 0)
         {
             Debug.Log("No path found");

@@ -15,11 +15,11 @@ public enum SortingType
 
 public class DungeonGenerator : MonoBehaviour
 {
+    
     [Header("Dungeon Settings")]
-    [SerializeField] private RectInt totalDungeonSize;
+    [SerializeField] private RectInt dungeonSize;
     [SerializeField] private int splitDepth;
     [SerializeField] private int minRoomSize;
-    [SerializeField] private int wallHeight = 3;
     [SerializeField] private int wallMargin = 1;
     [SerializeField] private int doorWidth = 2;
 
@@ -27,12 +27,7 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField] private int dungeonSeed;
     [SerializeField] private bool instantGeneration = true;
     [SerializeField] private float stepDelay;
-    [SerializeField] private bool showRoomOutline = true;
-    [SerializeField] private bool showDoorsOutline = true;
-    [SerializeField] private bool showConnectionGraph = true;
-    [SerializeField] private bool showVisuals = true;
     
-
     [Header("Visuals")]
     [SerializeField] private Transform wallsParent; 
     [SerializeField] private Transform floorsParent;
@@ -44,11 +39,17 @@ public class DungeonGenerator : MonoBehaviour
     [SerializeField]private PathFinder pathFinder;
 
     [Header("Debug")]
+    [SerializeField] private bool showRoomOutline = true;
+    [SerializeField] private bool showDoorsOutline = true;
+    [SerializeField] private bool showConnectionGraph = true;
+    [SerializeField] private bool showVisuals = true;
+
     [SerializeField] private List<RectInt> createdRooms = new();
-    [SerializeField] private List<RectInt> doors = new();
-    [SerializeField] private List<RectInt> connections = new();
+    [SerializeField] private List<RectInt> createdDoors = new();
     [SerializeField] private List<Vector3> createdFloors = new();
 
+
+    //A button that starts the next step of the dungeon generation
     private bool continueStep = false;
     [Button]
     public void NextStep()
@@ -56,67 +57,52 @@ public class DungeonGenerator : MonoBehaviour
         continueStep = true;
     }
 
-    private bool pauseGeneration = false;
-
-    [Button]
-    public void PauseGeneration()
-    {
-        pauseGeneration = !pauseGeneration;
-    }
-
-    //key = door, value is connection
-    private Dictionary<RectInt, List<RectInt>> roomAdjacencyList = new();
-
-    private Dictionary<RectInt, List<RectInt>> doorConnections = new();
-    private Dictionary<RectInt, List<RectInt>> roomConnections = new();
-
-    private List<Color> drawColors = new();
-    private Color depthColor = Color.red;
-
-
+    //Room Splitting variables
     private bool isSplittingHorizontal = true;
 
     private int currentDepth;
     private int roomCounter = 0;
 
-    private int a = 0;
+    private int expectedRoomSplits = 0;
     private int roomDeduction = 0;
 
+    private List<Color> drawColors = new();
+    private Color depthColor = Color.red;
+
+    //This contains the rooms that are attached to eachother.
+    private Dictionary<RectInt, List<RectInt>> roomAdjacencyList = new();
+
+    //This is for the graph, it contains a list of doors and their connections to the rooms.
+    private Dictionary<RectInt, List<RectInt>> doorConnections = new();
+
+    
     private int[,] tileMap;
     private int[,] binaryTileMap;
-
-    public int[,] TileMap
-    {
-        get { return tileMap; }
-    }
 
 
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        minRoomSize += wallMargin;
-
-        Debug.Log(totalDungeonSize.xMin);
-        Debug.Log(totalDungeonSize.xMax);
+        //If the seed wasnt given from the start then create a seed
         if(dungeonSeed == 0)
         {
             dungeonSeed = Random.seed;
-            Random.InitState(dungeonSeed);
         }
 
         Random.InitState(dungeonSeed);
 
-        minRoomSize += wallMargin;
+        //Takes the wall margin into account so that intersecting walls dont make the room to small.
+        minRoomSize += wallMargin * 2;
         
-        StartCoroutine(Generation(totalDungeonSize));
+        //Start Generation
+        StartCoroutine(Generation(dungeonSize));
     }
 
     // Update is called once per frame
     void Update()
     {
-        //main dungeon size
-        AlgorithmsUtils.DebugRectInt(totalDungeonSize, Color.red);
-
+        //Draws the main outline
+        AlgorithmsUtils.DebugRectInt(dungeonSize, Color.red);
 
         if (showRoomOutline)
         {
@@ -128,9 +114,9 @@ public class DungeonGenerator : MonoBehaviour
 
         if (showDoorsOutline)
         {
-            for (int i = 0; i < doors.Count; i++)
+            for (int i = 0; i < createdDoors.Count; i++)
             {
-                AlgorithmsUtils.DebugRectInt(doors[i], Color.yellow);
+                AlgorithmsUtils.DebugRectInt(createdDoors[i], Color.yellow);
             }
         }
 
@@ -138,11 +124,13 @@ public class DungeonGenerator : MonoBehaviour
         {
             foreach (var item in doorConnections)
             {
+                //Gets the center of the door
                 Vector3 doorCenter = GetCenter(item.Key);
                 DebugExtension.DebugWireSphere(doorCenter, Color.blue);
 
                 var roomConnection = doorConnections[item.Key];
 
+                //Creating a sphere for each room and drawing lines towards the door
                 for (int i = 0; i < roomConnection.Count; i++)
                 {
                     Vector3 roomCenter = GetCenter(roomConnection[i]);
@@ -167,27 +155,35 @@ public class DungeonGenerator : MonoBehaviour
 
         Q.Enqueue(room);
 
+        //If the que is not 0 AND currentDepth is not the final splitDepth
         while (currentDepth != splitDepth && Q.Count != 0) 
         {
             RectInt currentRoom = Q.Dequeue();
 
+            //If it can split the room and it has not been discovered
             if (!discovered.Contains(currentRoom) && CanSplitRoom(currentRoom, Q, discovered))
             {
                 discovered.Add(currentRoom);
 
+                //Splits the room into two RectInts
                 RectInt[] splitRooms = SplitRoom(currentRoom);
 
+                //if it somehow adds an already existing room, remove that room.
                 if (createdRooms.Contains(currentRoom))
                 {
                     int index = createdRooms.IndexOf(currentRoom);
                     createdRooms.Remove(currentRoom);
                 }
 
+                //loops through the created rooms
                 for (int i = 0; i < splitRooms.Length; i++)
                 {
                     Q.Enqueue(splitRooms[i]);
+
+                    //Adds them to the debug list of created rooms
                     createdRooms.Add(splitRooms[i]);
 
+                    //assigngs the current depth color to this room
                     drawColors.Add(depthColor);
                     roomCounter++;
 
@@ -197,6 +193,7 @@ public class DungeonGenerator : MonoBehaviour
                     }
                 }
             }
+            //if the room couldnt be split or was already discovered, add up the room counter.
             else
             {
                 roomCounter += 2;
@@ -207,24 +204,27 @@ public class DungeonGenerator : MonoBehaviour
         yield return new WaitUntil(() => continueStep || instantGeneration);
         continueStep = false;
         #region Remove 10%
-        //remove 10% of the smallest rooms
+        //sorts the rooms based on size
         BubbleSorter(createdRooms, SortingType.Size);
 
+        //calculates how many rooms are in the 10%
         int amountOfRooms = Mathf.RoundToInt(0.10f * createdRooms.Count);
 
+        //removes 10% of all the rooms
         for (int i = 0; i < amountOfRooms; i++)
         {
             createdRooms.RemoveAt(i);
         }
         #endregion
 
-        //sort by position
+        //sorts the rooms by position
         BubbleSorter(createdRooms, SortingType.Position);
 
         yield return new WaitUntil(() => continueStep || instantGeneration);
         continueStep = false;
 
-        #region Door Creation
+        #region Door and Graph Creation
+        //creation of the doors and Graph
         Stack<RectInt> stackRooms = new();
         HashSet<RectInt> Discovered = new();
 
@@ -234,53 +234,58 @@ public class DungeonGenerator : MonoBehaviour
         {
             RectInt current = stackRooms.Pop();
 
+            //Adds the current room the adjency list.
             AddRoom(current);
 
+            //If the current room has not been discovered
             if (!Discovered.Contains(current))
             {
+                //Checks through all the neighbours to see if they are discovered yet
                 foreach (RectInt neighbour in GetNeighbours(current))
                 {
                     if (Discovered.Contains(neighbour))
                     {
-                        //CURRENT AND NEIGHBOUR CAN BE CNNECTED
+                        //If a neighbour has been discovered before, add a room between them
                         RectInt door = AddDoors(neighbour, current);
-                        doors.Add(door);
+                        createdDoors.Add(door);
 
+                        //Adds a connection between the door and the rooms
                         RectInt[] roomCon = { neighbour, current };
-                        connections.Add(neighbour);
-                        connections.Add(current);
                         AddRoomConnection(door, roomCon);
                     }
                     
                     
                 }
                 
+                //Adds this room the the discovery list
                 Discovered.Add(current);
 
-                //find neighbours
+                //Searches through the created rooms
                 foreach (RectInt node in createdRooms)
                 {
+                    //Checks if there is room for a door, it has not been discovered and if it's already in the roomAdjacencyList.
                     if (CanAddDoor(current, node) && !Discovered.Contains(node) && !roomAdjacencyList.ContainsKey(node) )
                     {
-                        //create neighbour
+                        //Creates an edge between the two rooms
                         AddEdge(current, node);
                     }
                     
                 }
 
+                //If the room has no neighbours then remove that room from the list
                 if(GetNeighbours(current).Count == 0)
                 {
                     createdRooms.Remove(current);
-                    Debug.Log(current);
                     stackRooms.Push(createdRooms[0]);
                 }
                 
-
+                //Pushes all the neighbours of this room to the stack
                 foreach (RectInt node in GetNeighbours(current))
                 {
                     stackRooms.Push(node);
                 }
                     
+
                 if (!instantGeneration)
                 {
                     yield return new WaitForSeconds(stepDelay);
@@ -293,37 +298,47 @@ public class DungeonGenerator : MonoBehaviour
         continueStep = false;
 
         #region Visuals
-        tileMap = new int[totalDungeonSize.height, totalDungeonSize.width];
 
-        foreach (var rooming in createdRooms)
+        //Creates the size of the tileMap
+        tileMap = new int[dungeonSize.height, dungeonSize.width];
+
+        //loops through all the rooms
+        foreach (var createdRoom in createdRooms)
         {
+            //loops through all the rooms again to find intersections
             foreach(var intersectRoom in createdRooms)
             {
-                if (rooming != intersectRoom)
+                //if the rooms are not the same then continue
+                if (createdRoom != intersectRoom)
                 {
-                    AlgorithmsUtils.FillRectangle(tileMap, AlgorithmsUtils.Intersect(rooming, intersectRoom), 1);
+                    //Fills up any intersecting areas with wall spaces
+                    AlgorithmsUtils.FillRectangle(tileMap, AlgorithmsUtils.Intersect(createdRoom, intersectRoom), 1);
                 }
             }
-            AlgorithmsUtils.FillRectangleOutline(tileMap, rooming, 1);
+            //creates the outline of the room
+            AlgorithmsUtils.FillRectangleOutline(tileMap, createdRoom, 1);
         }
 
-
-        foreach (var door in doors)
+        //Loops through all the doors and makes space for them
+        foreach (var door in createdDoors)
         {
             AlgorithmsUtils.FillRectangleOutline(tileMap, door, 0);
         }
 
+        //Converts the tilemap into the binary tilemap
         ConvertToBinary(tileMap);
 
-        //y
+        //Loops through the binaryTileMap to instantiate the core responding wall
+        //y loop
         for (int i = 0; i < binaryTileMap.GetLength(0); i++)
         {
-            //x
+            //x loop
             for (int j = 0; j < binaryTileMap.GetLength(1); j++)
             {
                 GameObject wall = gameObject;
                 Vector3 rotation = Vector3.zero;
 
+                //Depending on the value, it sets the wall and it's rotation
                 switch (binaryTileMap[i, j])
                 {
                     case 0:
@@ -385,10 +400,14 @@ public class DungeonGenerator : MonoBehaviour
                         rotation = new Vector3(0, 180, 0);
                         break;
                     case 15:
+                        //if the wall is 15 (has walls on every side) then continue
                         continue;
                 }
 
+                //instantiates the wall at the next position
                 GameObject prefab = Instantiate(wall, new Vector3(j + 1f, 0, i + 1f), Quaternion.identity, wallsParent);
+
+                //sets the rotation of the object
                 prefab.transform.localEulerAngles = rotation;
                 if (!instantGeneration)
                 {
@@ -400,20 +419,27 @@ public class DungeonGenerator : MonoBehaviour
         yield return new WaitUntil(() => continueStep || instantGeneration);
         continueStep = false;
 
-        Queue<Vector2Int> FloorQueue = new();
+        //This BFS creates the floors for the dungeon
+
+        Queue<Vector2Int> floorQueue = new();
         HashSet<Vector2Int> floorDiscovered = new();
 
-        FloorQueue.Enqueue(new Vector2Int(createdRooms[0].y + 1, createdRooms[0].x + 1));
+        //enqueues the first position inside of the first room
+        floorQueue.Enqueue(new Vector2Int(createdRooms[0].y + 1, createdRooms[0].x + 1));
 
-        while (FloorQueue.Count > 0)
+        while (floorQueue.Count > 0)
         {
-            Vector2Int current = FloorQueue.Dequeue();
+            Vector2Int current = floorQueue.Dequeue();
             floorDiscovered.Add(current);
 
-
+            //it instantiates the wall at the said position and parents it.
             GameObject objec = Instantiate(wallPrefabs[0], new Vector3(current.y + 0.5f, 0, current.x + 0.5f), Quaternion.identity, floorsParent);
+            
+            //Gives the position and tilemap index for debug purposes
             objec.name = $"{current.x}, {current.y}, index: {tileMap[current.x, current.y]}";
-            if (TileMap[current.x, current.y] == 0)
+
+            //if the tilemap index is 0 then add it to the createdFloors list
+            if (tileMap[current.x, current.y] == 0)
             {
                 createdFloors.Add(objec.transform.position);
             }
@@ -423,11 +449,13 @@ public class DungeonGenerator : MonoBehaviour
                 yield return new WaitForSeconds(stepDelay);
             }
 
+            //gets the neighbours of the current floor tile
             foreach (Vector2Int tile in GetTileMapNeighbours(tileMap, current))
             {
-                if (!floorDiscovered.Contains(tile) && !FloorQueue.Contains(tile) && IsValidIndex(tileMap[current.x, current.y]))
+                //if the floor is not discovered, not in the queue and is a valid index then enqueue the neibour
+                if (!floorDiscovered.Contains(tile) && !floorQueue.Contains(tile) && IsValidIndex(tileMap[current.x, current.y]))
                 {
-                    FloorQueue.Enqueue(tile);
+                    floorQueue.Enqueue(tile);
                 }
             }
         }
@@ -436,8 +464,11 @@ public class DungeonGenerator : MonoBehaviour
         yield return new WaitUntil(() => continueStep || instantGeneration);
         continueStep = false;
 
+        //set the player position at the first room
         player.position = new Vector3(createdRooms[0].xMin + 1.5f, 1, createdRooms[0].yMin + 1.5f);
-        pathFinder.SetGraph(createdFloors, totalDungeonSize);
+
+        //Gives the pathFinder it's required values
+        pathFinder.SetGraph(createdFloors, dungeonSize);
         //activate playability
     }
 
@@ -445,19 +476,26 @@ public class DungeonGenerator : MonoBehaviour
     public bool CanSplitRoom(RectInt currentRoom, Queue<RectInt> q, HashSet<RectInt> discovered)
     {
         //Splits the room if it hit the end of the next level.
-        if (roomCounter + a == 0)
+        if (roomCounter + expectedRoomSplits == 0)
         {
-            a = 1;
+            expectedRoomSplits = 1;
         }
-        else if (roomCounter >= a * 2 - roomDeduction)
+        //Splits the room once it hits the expected split rooms.
+        //It takes deducted rooms into account for rooms that couldnt be split.
+        else if (roomCounter >= expectedRoomSplits * 2 - roomDeduction)
         {
-            a = roomCounter;
+            //resets values
+            expectedRoomSplits = roomCounter;
             roomCounter = 0;
             roomDeduction = 0;
+
+            //Set next Depth
             currentDepth++;
 
+            //Switches the splitting direction
             isSplittingHorizontal = !isSplittingHorizontal;
 
+            //Sets a random color for each depth for debugging purposes.
             depthColor = new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f));
         }
 
@@ -466,51 +504,62 @@ public class DungeonGenerator : MonoBehaviour
             return false;
         }
         
+        
         bool checkSecondSplit = false;
         bool currentSplit = isSplittingHorizontal;
 
+        //Loops all posibilities if needed
         for (int i = 0; i < 2; i++)
         {
+            //if splitting horizontaly
             if (currentSplit)
             {
-                int maxHeight = currentRoom.height - minRoomSize;
-
-                if (maxHeight > minRoomSize)
+                //calculates if the minRoom size even fits in the current room split.
+                if (currentRoom.height - minRoomSize > minRoomSize)
                 {
                     if (!checkSecondSplit)
                     {
+                        //The room can be split in it's current split
                         return true;
                     }
                     else
                     {
+                        //The room can be split in the next Level/Depth.
+                        //it will requeue the room so it can be used in the next depth
                         discovered.Remove(currentRoom);
                         q.Enqueue(currentRoom);
                         return false;
                     }
                 }
             }
+            //if splitting vertically
             else
             {
-                int maxWidth = currentRoom.width - minRoomSize;
-
-                if (maxWidth > minRoomSize)
+                //calculates if the minRoom size even fits in the current room split.
+                if (currentRoom.width - minRoomSize > minRoomSize)
                 {
                     if (!checkSecondSplit)
                     {
+                        //The room can be split in it's current split
                         return true;
                     }
                     else
                     {
+                        //The room can be split in the next Level/Depth.
+                        //it will requeue the room so it can be used in the next depth
                         discovered.Remove(currentRoom);
                         q.Enqueue(currentRoom);
                         return false;
                     }
                 }
             }
+            //Checks if the other split direction is possible
             checkSecondSplit = true;
             currentSplit = !currentSplit;
         }
 
+
+        //if neither split direction works, then deduct both posibilities from the expected rooms.
         roomDeduction += 2;
         return false;
     }
@@ -518,31 +567,39 @@ public class DungeonGenerator : MonoBehaviour
     {
         RectInt[] nextRoomArray = new RectInt[2];
 
+        //Checks which direction it has been split in
         if (isSplittingHorizontal)
         {
+            //gets a random point where the room will be split
             int splitHeight = Random.Range(minRoomSize, currentRoom.height - minRoomSize);
 
+            //Sets the sizes of each room
             Vector2Int roomSize1 = new(currentRoom.width, splitHeight);
             Vector2Int roomSize2 = new(currentRoom.width, currentRoom.height - splitHeight);
 
-            //splitA
+            //Bottom Room Rect
+            //adds more space for the wall
             nextRoomArray[0] = new(currentRoom.x, currentRoom.y, roomSize1.x, roomSize1.y + wallMargin);
-            //top right
-            nextRoomArray[1] = new(currentRoom.x, roomSize1.y + currentRoom.y, roomSize2.x, roomSize2.y);
+            //Top Room Rect
+            nextRoomArray[1] = new(currentRoom.x, currentRoom.y + roomSize1.y , roomSize2.x, roomSize2.y);
         }
         else
         {
+            //gets a random point where the room will be split
             int splitLength = Random.Range(minRoomSize, currentRoom.width - minRoomSize);
 
+            //Sets the sizes of each room
             Vector2Int roomSize1 = new(splitLength, currentRoom.height);
             Vector2Int roomSize2 = new(currentRoom.width - splitLength, currentRoom.height);
 
-            //splitA
+            //Left Room Rect
+            //adds more space for the wall
             nextRoomArray[0] = new(currentRoom.x, currentRoom.y, roomSize1.x + wallMargin, roomSize1.y);
-            //top right
+            //Right Room Rect
             nextRoomArray[1] = new(roomSize1.x + currentRoom.x, currentRoom.y, roomSize2.x, roomSize2.y);
         }
 
+        //returns the array of rooms
         return nextRoomArray;
     }
     #endregion
@@ -550,8 +607,10 @@ public class DungeonGenerator : MonoBehaviour
     //sorting rooms
     private void BubbleSorter(List<RectInt> rooms, SortingType type)
     {
+        //Loops through all the rooms and going down the count
         for (int i = rooms.Count - 2; i >= 0; i--)
         {
+            //loops each time till it reaches i
             for (int j = 0; j <= i; j++)
             {
                 int sizeA = 0;
@@ -582,72 +641,85 @@ public class DungeonGenerator : MonoBehaviour
     //Adding Doors
     public bool CanAddDoor(RectInt roomA, RectInt roomB)
     {
+        //if the rooms are not the same, then continue
         if (roomA != roomB)
         {
+            //gets the intersection of the wall
             RectInt intersection = AlgorithmsUtils.Intersect(roomA, roomB);
+
+            //calculates the minimum area the it is supposed to be
             int minArea = minRoomSize * wallMargin;
+            //the size of the intersected area
             int area = intersection.width * intersection.height;
 
+            //if the area is bigger then the minimum then return true
             if (area > minArea)
             {
                 return true;
             }
         }
+
+        //if the rooms were the same OR the area was smaller then the minimum then return false
         return false;
     }
     public RectInt AddDoors(RectInt currentRoom, RectInt overlappingRoom)
     {
+        //gets the overlapping intersection of the rooms
         RectInt wall = AlgorithmsUtils.Intersect(currentRoom, overlappingRoom);
 
+        //Checks if it's a horizontal wall or a vertical one
         if (wall.width > wall.height)
         {
             //horizontal
+
+            //calculates the area in where the door can be placed
             wall.x += wallMargin;
             wall.width -= wallMargin * 2;
 
+            //choses a random position between that part of the wall
             int randomX = Random.Range(wall.xMin, wall.xMax - 1);
 
+            //returns the door position and size
             return new RectInt(randomX, wall.y, doorWidth, wall.height);
         }
         else
         {
             //vertical
+
+            //calculates the area in where the door can be placed
             wall.y += wallMargin;
             wall.height -= wallMargin * 2;
 
+            //choses a random position between that part of the wall
             int randomY = Random.Range(wall.yMin, wall.yMax - 1);
 
+            //returns the door position and size
             return new RectInt(wall.x, randomY, wall.width, doorWidth);
         }
 
     }
     private void AddRoomConnection(RectInt currentDoor, RectInt[] connectedRooms)
     {
+        //Checks if there is already a current door in the connections list
         if (!doorConnections.ContainsKey(currentDoor))
         {
+            //adds the door and a new list for the rooms
             doorConnections[currentDoor] = new List<RectInt>();
         }
-        for (int i = 0; i < connectedRooms.Length; i++)
-        {
-            if (!roomConnections.ContainsKey(connectedRooms[i]))
-            {
-                roomConnections[connectedRooms[i]] = new List<RectInt>();
-            }
 
-        }
-
+        //Adds all the rooms to the door
         doorConnections[currentDoor].Add(connectedRooms[0]);
         doorConnections[currentDoor].Add(connectedRooms[1]);
-        roomConnections[connectedRooms[0]].Add(currentDoor);
-        roomConnections[connectedRooms[1]].Add(currentDoor);
     }
 
     private List<RectInt> GetNeighbours(RectInt currentRoom)
     {
+        //gets all the neighbours of the chosen room
         return new List<RectInt>(roomAdjacencyList[currentRoom]);
     }
     public void AddRoom(RectInt node)
     {
+        //Adds a room if it wasn't found in the list yet
         if (!roomAdjacencyList.ContainsKey(node))
         {
             roomAdjacencyList[node] = new List<RectInt>();
@@ -655,6 +727,8 @@ public class DungeonGenerator : MonoBehaviour
     }
     public void AddEdge(RectInt fromNode, RectInt toNode)
     {
+        //Checks if any of the rooms are already inside the list
+        //if not add a new room
         if (!roomAdjacencyList.ContainsKey(fromNode))
         {
             AddRoom(fromNode);
@@ -664,29 +738,34 @@ public class DungeonGenerator : MonoBehaviour
             AddRoom(toNode);
         }
 
+        //creates the edge between the rooms
         roomAdjacencyList[fromNode].Add(toNode);
         roomAdjacencyList[toNode].Add(fromNode);
     }
 
     //Node Graph
-    private Vector3 GetCenter(RectInt target)
+    private Vector3 GetCenter(RectInt area)
     {
-        float x = target.xMin + (float)(target.xMax - target.xMin) / 2;
-        float y = target.yMin + (float)(target.yMax - target.yMin) / 2; 
-        return new Vector3(x, 0, y) ;
+        //returns a vector3 of the areas center
+        return new Vector3(area.center.x, 0, area.center.y) ;
     }
     #endregion
 
     #region SquareMarching
     public void ConvertToBinary(int[,] tilemap)
     {
+        //Sets the size of the binaryTilemap
         binaryTileMap = new int[tilemap.GetLength(0) - 1, tilemap.GetLength(1) - 1];
-        //y
+
+        //Marches through each position in a 2 by 2 square
+        //y loop
         for (int i = 0; i < tilemap.GetLength(0) - 1; i++)
         {
-            //x 
+            //x loop
             for (int j = 0; j < tilemap.GetLength(1) - 1; j++)
             {
+                //Checks all the surrounding tiles
+                //If a tile is 1 it will multiply it by their coreresponding value.
                 binaryTileMap[i, j] = tilemap[i, j] * 1 +
                    tilemap[i, j + 1] * 2 +
                    tilemap[i + 1, j + 1] * 4 +
@@ -697,33 +776,31 @@ public class DungeonGenerator : MonoBehaviour
 
     public bool IsValidIndex(int newIndex)
     {
+        //checks if tile is equal to 0
         return newIndex == 0;
     }
 
     public List<Vector2Int> GetTileMapNeighbours(int[,] tileMap, Vector2Int tileMapPos)
     {
+        //creates a new list for the neighbours
         List<Vector2Int> neighbours = new();
 
-
+        //set the min max y positions based on the tilemap length and curren position
         int yMin = Mathf.Clamp(tileMapPos.x - 1, 0, tileMap.GetLength(0));
-        //int yMin = tileMapPos.y - 1;
         int yMax = Mathf.Clamp(tileMapPos.x + 1, 0 , tileMap.GetLength(0));
-        //int yMax = tileMapPos.y + 1;
 
-
+        //sets the min max x positions based on the tilemap length and curren position
         int xMin = Mathf.Clamp(tileMapPos.y - 1,0, tileMap.GetLength(1));
-        //int xMin = tileMapPos.x - 1;
         int xMax = Mathf.Clamp(tileMapPos.y + 1,0, tileMap.GetLength(1));
-        //int xMax = tileMapPos.x + 1;
 
 
-        //y
+        //loop the y till it reaches the max
         for (int i = yMin; i <= yMax; i++)
         {
-            //x
+            //loop the x till it reaches its max
             for (int j = xMin; j <= xMax; j++)
             {
-                //Debug.Log(new Vector2Int(i, j) + "  Found Position: " + tileMap[i,j]);
+                //Adds the potential neighbouring positions
                 neighbours.Add(new Vector2Int(i, j));
             }
         }
@@ -731,36 +808,5 @@ public class DungeonGenerator : MonoBehaviour
         return neighbours;
     }
 
-    public string ToString(bool flip, int[,] tilemap)
-    {
-        if (tilemap == null) return "Tile map not generated yet.";
-
-        int rows = tilemap.GetLength(0);
-        int cols = tilemap.GetLength(1);
-
-        var sb = new StringBuilder();
-
-        int start = flip ? rows - 1 : 0;
-        int end = flip ? -1 : rows;
-        int step = flip ? -1 : 1;
-
-        for (int i = start; i != end; i += step)
-        {
-            for (int j = 0; j < cols; j++)
-            {
-                sb.Append((tilemap[i, j] == 0 ? '0' : '#')); //Replaces 1 with '#' making it easier to visualize
-            }
-            sb.AppendLine();
-        }
-
-        return sb.ToString();
-    }
     #endregion
-
-
-    [Button]
-    public void PrintTileMap(int[,] tilemap)
-    {
-        Debug.Log(ToString(true, tilemap));
-    }
 }
