@@ -13,6 +13,15 @@ public enum SortingType
     Position
 }
 
+public enum GenerationType
+{
+    Instant,
+    Timed,
+    Step,
+    TimedStep
+
+}
+
 public class DungeonGenerator : MonoBehaviour
 {
     
@@ -25,7 +34,7 @@ public class DungeonGenerator : MonoBehaviour
 
     [Header("Generation Settings")]
     [SerializeField] private int dungeonSeed;
-    [SerializeField] private bool instantGeneration = true;
+    [SerializeField] private GenerationType generationType = GenerationType.Step;
     [SerializeField] private float stepDelay;
     
     [Header("Visuals")]
@@ -187,7 +196,7 @@ public class DungeonGenerator : MonoBehaviour
                     drawColors.Add(depthColor);
                     roomCounter++;
 
-                    if (!instantGeneration)
+                    if (generationType == GenerationType.Timed || generationType == GenerationType.TimedStep)
                     {
                         yield return new WaitForSeconds(stepDelay);
                     }
@@ -201,7 +210,7 @@ public class DungeonGenerator : MonoBehaviour
         }
         #endregion
 
-        yield return new WaitUntil(() => continueStep || instantGeneration);
+        yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
         #region Remove 10%
         //sorts the rooms based on size
@@ -220,7 +229,7 @@ public class DungeonGenerator : MonoBehaviour
         //sorts the rooms by position
         BubbleSorter(createdRooms, SortingType.Position);
 
-        yield return new WaitUntil(() => continueStep || instantGeneration);
+        yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
 
         #region Door and Graph Creation
@@ -286,7 +295,7 @@ public class DungeonGenerator : MonoBehaviour
                 }
                     
 
-                if (!instantGeneration)
+                if (generationType == GenerationType.Timed || generationType == GenerationType.TimedStep)
                 {
                     yield return new WaitForSeconds(stepDelay);
                 }
@@ -294,7 +303,7 @@ public class DungeonGenerator : MonoBehaviour
         }
         #endregion
 
-        yield return new WaitUntil(() => continueStep || instantGeneration);
+        yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
 
         #region Visuals
@@ -409,14 +418,14 @@ public class DungeonGenerator : MonoBehaviour
 
                 //sets the rotation of the object
                 prefab.transform.localEulerAngles = rotation;
-                if (!instantGeneration)
+                if (generationType == GenerationType.Timed || generationType == GenerationType.TimedStep)
                 {
                     yield return new WaitForSeconds(stepDelay);
                 }
             }
         }
 
-        yield return new WaitUntil(() => continueStep || instantGeneration);
+        yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
 
         //This BFS creates the floors for the dungeon
@@ -444,7 +453,7 @@ public class DungeonGenerator : MonoBehaviour
                 createdFloors.Add(objec.transform.position);
             }
 
-            if (!instantGeneration)
+            if (generationType == GenerationType.Timed || generationType == GenerationType.TimedStep)
             {
                 yield return new WaitForSeconds(stepDelay);
             }
@@ -461,7 +470,7 @@ public class DungeonGenerator : MonoBehaviour
         }
         #endregion
 
-        yield return new WaitUntil(() => continueStep || instantGeneration);
+        yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
 
         //set the player position at the first room

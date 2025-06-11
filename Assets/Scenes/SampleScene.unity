@@ -218,10 +218,10 @@ MonoBehaviour:
     height: 80
   splitDepth: 9
   minRoomSize: 5
-  wallMargin: 3
+  wallMargin: 2
   doorWidth: 2
   dungeonSeed: 0
-  instantGeneration: 1
+  generationType: 0
   stepDelay: 0
   wallsParent: {fileID: 1743453381}
   floorsParent: {fileID: 1718480650}

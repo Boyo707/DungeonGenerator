@@ -110,30 +110,28 @@ public class PathFinder : MonoBehaviour
         //the playerposition is the from
         Vector3 playerPosition = from;
 
-        Debug.Log(playerPosition);
-
         //finds the closest node to the player
         startNode = GetClosestNodeToPosition(playerPosition);
-        Debug.Log(startNode);
 
         //finds the closest clicked node 
         endNode = GetClosestNodeToPosition(to);
-        Debug.Log(endNode);
 
         //calculates the path in Astar
         return AStar(startNode, endNode);
     }
     private Vector3 GetClosestNodeToPosition(Vector3 position)
     {
+        
         //Lowers the position to 0 for better reach
-        Vector3 loweredPos = new Vector3(position.x, 0, position.y);
+        Vector3 loweredPos = new Vector3(position.x, 0.00f, position.z);
         
         // Gets the nodes of the graph and loops through them
         List<Vector3> nodes = graph.GetNodes();
         for (int i = 0; i < nodes.Count; i++)
         {
+
             //If it found a node that's closer then 0.6 then return
-            if (Vector3.Distance(nodes[i], loweredPos) < 0.6f)
+            if (Vector3.Distance(nodes[i], loweredPos) <= 0.6f)
             {
                 return nodes[i];
             }
@@ -163,10 +161,8 @@ public class PathFinder : MonoBehaviour
 
         //sets the cost of the first node on 0
         C[v] = 0;
-        Debug.Log("Before while");
         while (Q.Count > 0)
         {
-            Debug.Log("Inside While");
             //sorts the Queue by priority
             Q = Q.OrderByDescending(node => node.priority).ToList();
             // gets the starting node
@@ -174,27 +170,21 @@ public class PathFinder : MonoBehaviour
             Q.RemoveAt(Q.Count - 1);
             discovered.Add(v);
 
-            Debug.Log("Before IF");
             //if the current node is the end node then construct the path towards the node.
             if (v == end)
             {
-                Debug.Log("Finished");
                 return ReconstructPath(P, start, end);
             }
 
-            Debug.Log("Before ForEach");
             //For every neighbour of the node
             foreach (Vector3 w in graph.GetNeighbors(v))
             {
-                Debug.Log("Inside Neighbour Foreach");
                 //Set a new cost
                 float newCost = C[v] + Cost(v, w);
 
                 //if There is no cost on the neighbour OR the newcost is lower then the neighbour cost
                 if (!C.ContainsKey(w) || newCost < C[w])
                 {
-                    Debug.Log("in if state");
-
                     //sets the new cost
                     C[w] = newCost;
                     //sets the parent of the node

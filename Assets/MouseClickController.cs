@@ -23,6 +23,7 @@ public class MouseClickController : MonoBehaviour
             }
         }
 
+        //draws a sphere and a line towards the clicked destination
         DebugExtension.DebugWireSphere(clickPosition, Color.yellow, .1f);
         Debug.DrawLine(Camera.main.transform.position, clickPosition, Color.yellow);
     }
