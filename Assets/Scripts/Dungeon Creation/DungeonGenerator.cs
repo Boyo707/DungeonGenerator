@@ -210,6 +210,8 @@ public class DungeonGenerator : MonoBehaviour
         }
         #endregion
 
+        Debug.Log("Finished Room Generation");
+
         yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
         #region Remove 10%
@@ -228,6 +230,9 @@ public class DungeonGenerator : MonoBehaviour
 
         //sorts the rooms by position
         BubbleSorter(createdRooms, SortingType.Position);
+
+        Debug.Log("Finished Removing 10% of the smallest rooms");
+        Debug.Log("Finished Room Sorting");
 
         yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
@@ -302,6 +307,8 @@ public class DungeonGenerator : MonoBehaviour
             }
         }
         #endregion
+
+        Debug.Log("Finished creating the Doors and the Graph");
 
         yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
@@ -425,6 +432,8 @@ public class DungeonGenerator : MonoBehaviour
             }
         }
 
+        Debug.Log("Finished generating the visuals");
+
         yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
 
@@ -469,6 +478,8 @@ public class DungeonGenerator : MonoBehaviour
             }
         }
         #endregion
+
+        Debug.Log("Finished flooding the rooms with floors");
 
         yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
