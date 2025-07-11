@@ -7,7 +7,7 @@ using Unity.AI.Navigation;
 using Unity.VisualScripting;
 using UnityEditor.Experimental.GraphView;
 
-public enum SortingType
+/*public enum SortingType
 {
     Size,
     Position
@@ -20,7 +20,7 @@ public enum GenerationType
     Step,
     TimedStep
 
-}
+}*/
 
 public class DungeonGenerator : MonoBehaviour
 {
