@@ -218,6 +218,8 @@ public class DungeonGenerator : MonoBehaviour
         //sorts the rooms based on size
         BubbleSorter(createdRooms, SortingType.Size);
 
+        //createdRooms.Sort ((a,b) => a.width * a.height - b.width * b.height);
+
         //calculates how many rooms are in the 10%
         int amountOfRooms = Mathf.RoundToInt(0.10f * createdRooms.Count);
 

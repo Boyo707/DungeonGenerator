@@ -221,7 +221,7 @@ MonoBehaviour:
   wallMargin: 2
   doorWidth: 2
   dungeonSeed: 0
-  generationType: 0
+  generationType: 2
   stepDelay: 0.3
   wallsParent: {fileID: 1743453381}
   floorsParent: {fileID: 1718480650}
