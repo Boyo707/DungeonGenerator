@@ -22,6 +22,13 @@ public class RoomRemover : MonoBehaviour
         //sorts the rooms by position
         BubbleSorter(rooms, SortingType.Position);
 
+        //If the room has no neighbours then remove that room from the list
+        /*if (GetNeighbours(current).Count == 0)
+        {
+            createdRooms.Remove(current);
+            stackRooms.Push(createdRooms[0]);
+        }*/
+
         return rooms;
     }
 

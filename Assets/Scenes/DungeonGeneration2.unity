@@ -177,12 +177,12 @@ GameObject:
   m_Component:
   - component: {fileID: 184818556}
   - component: {fileID: 184818563}
+  - component: {fileID: 184818558}
   - component: {fileID: 184818562}
+  - component: {fileID: 184818557}
+  - component: {fileID: 184818559}
   - component: {fileID: 184818561}
   - component: {fileID: 184818560}
-  - component: {fileID: 184818559}
-  - component: {fileID: 184818558}
-  - component: {fileID: 184818557}
   m_Layer: 0
   m_Name: DungeonGenerator
   m_TagString: Untagged
@@ -229,7 +229,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3d8a1dd105b3a9545b58d2dfd2f5a47c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  createdRooms: []
 --- !u!114 &184818559
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -299,15 +298,16 @@ MonoBehaviour:
   dungeonSize:
     x: 0
     y: 0
-    width: 0
-    height: 0
+    width: 50
+    height: 50
+  canSplitRandomly: 0
   splitDepth: 0
-  minRoomSize: 0
+  minRoomSize: 5
   wallMargin: 1
   doorWidth: 2
   dungeonSeed: 0
-  generationType: 2
-  stepDelay: 0
+  generationType: 3
+  stepDelay: 0.1
   wallsParent: {fileID: 0}
   floorsParent: {fileID: 0}
   offset: {x: 0, y: 0, z: 0}

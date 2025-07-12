@@ -2,11 +2,6 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 using NaughtyAttributes;
-using System.Text;
-using Unity.AI.Navigation;
-using Unity.VisualScripting;
-using UnityEditor.Experimental.GraphView;
-using Mono.Cecil.Cil;
 
 public enum SortingType
 {
@@ -28,6 +23,7 @@ public class Dungeon2 : MonoBehaviour
 
     [Header("Dungeon Settings")]
     [SerializeField] public RectInt dungeonSize;
+    [SerializeField] public bool canSplitRandomly;
     [SerializeField] public int splitDepth;
     [SerializeField] public int minRoomSize;
     [SerializeField] public int wallMargin = 1;
@@ -54,9 +50,11 @@ public class Dungeon2 : MonoBehaviour
     [SerializeField] private bool showConnectionGraph = true;
     [SerializeField] private bool showVisuals = true;
 
-    [SerializeField] private List<RectInt> createdRooms = new();
-    [SerializeField] private List<RectInt> createdDoors = new();
+    [SerializeField] public List<RectInt> createdRooms = new();
+    [SerializeField] public List<RectInt> createdDoors = new();
     [SerializeField] private List<Vector3> createdFloors = new();
+
+    public Graph<RectInt> roomAdjacencyList = new();
 
     private RoomSplitting roomSplitting;
     private DoorNGraphGeneration doorNGraphGen;
@@ -103,7 +101,7 @@ public class Dungeon2 : MonoBehaviour
         Random.InitState(dungeonSeed);
 
         //Takes the wall margin into account so that intersecting walls dont make the room to small.
-        minRoomSize += wallMargin * 2;
+        minRoomSize += wallMargin;
         
         //Start Generation
         StartCoroutine(Generation(dungeonSize));
@@ -112,16 +110,17 @@ public class Dungeon2 : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        
         //Draws the main outline
 
         if (showRoomOutline)
         {
             for (int i = 0; i < createdRooms.Count; i++)
             {
-                AlgorithmsUtils.DebugRectInt(createdRooms[i], drawColors[i]);
+                AlgorithmsUtils.DebugRectInt(createdRooms[i], Color.red);
             }
         }
-
+        
         if (showDoorsOutline)
         {
             for (int i = 0; i < createdDoors.Count; i++)
@@ -132,33 +131,33 @@ public class Dungeon2 : MonoBehaviour
 
         if (showConnectionGraph)
         {
-            /*foreach (var item in doorConnections)
+            foreach (var item in roomAdjacencyList.GetNodes())
             {
                 //Gets the center of the door
-                Vector3 doorCenter = GetCenter(item.Key);
+                Vector3 doorCenter = GetCenter(item);
                 DebugExtension.DebugWireSphere(doorCenter, Color.blue);
 
-                var roomConnection = doorConnections[item.Key];
+                var roomConnection = roomAdjacencyList.GetNeighbors(item);
 
                 //Creating a sphere for each room and drawing lines towards the door
-                for (int i = 0; i < roomConnection.Count; i++)
-                {
-                    Vector3 roomCenter = GetCenter(roomConnection[i]);
+                foreach(var neighbour in roomAdjacencyList.GetNeighbors(item))
+                { 
+                    Vector3 roomCenter = GetCenter(neighbour);
                     DebugExtension.DebugWireSphere(roomCenter, Color.green);
 
                     Debug.DrawLine(roomCenter, doorCenter);
                 }
-            }*/
+            }
         }
 
-        wallsParent.gameObject.SetActive(showVisuals);
-        floorsParent.gameObject.SetActive(showVisuals);
+        /*wallsParent.gameObject.SetActive(showVisuals);
+        floorsParent.gameObject.SetActive(showVisuals);*/
     }
 
     IEnumerator Generation(RectInt room)
     {
         //rooms splitting
-        StartCoroutine(roomSplitting.Splitting(stepDelay));
+        yield return StartCoroutine(roomSplitting.Splitting(stepDelay, dungeonSeed));
         Debug.Log("Finished Room Generation");
 
         yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
@@ -199,5 +198,11 @@ public class Dungeon2 : MonoBehaviour
         //Gives the pathFinder it's required values
         pathFinder.SetGraph(createdFloors, dungeonSize);
         //activate playability
+    }
+
+    private Vector3 GetCenter(RectInt area)
+    {
+        //returns a vector3 of the areas center
+        return new Vector3(area.center.x, 0, area.center.y);
     }
 }
