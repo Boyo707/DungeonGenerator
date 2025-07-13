@@ -4,24 +4,24 @@ using UnityEngine;
 
 public class FloorFlood : MonoBehaviour
 {
-    public IEnumerator GenerateFloors(float stepDelay, int dungeonSeed)
+    public IEnumerator GenerateFloors(float stepDelay, int dungeonSeed, Dungeon2 dungeonGenerator)
     {
         Random.InitState(dungeonSeed);
 
         Queue<Vector2Int> floorQueue = new();
         HashSet<Vector2Int> floorDiscovered = new();
 
-        int[,] tileMap = Dungeon2.instance.tileMap;
+        int[,] tileMap = dungeonGenerator.tileMap;
 
         //enqueues the first position inside of the first room
-        floorQueue.Enqueue(new Vector2Int(Dungeon2.instance.createdRooms[0].y + 1, Dungeon2.instance.createdRooms[0].x + 1));
+        floorQueue.Enqueue(new Vector2Int(dungeonGenerator.createdRooms[0].y + 1, dungeonGenerator.createdRooms[0].x + 1));
 
         while (floorQueue.Count > 0)
         {
             Vector2Int current = floorQueue.Dequeue();
             floorDiscovered.Add(current);
 
-            GameObject objec = Instantiate(Dungeon2.instance.wallPrefabs[0], new Vector3(current.y + 0.5f, 0, current.x + 0.5f), Quaternion.identity, Dungeon2.instance.floorsParent);
+            GameObject objec = Instantiate(dungeonGenerator.wallPrefabs[0], new Vector3(current.y + 0.5f, 0, current.x + 0.5f), Quaternion.identity, dungeonGenerator.floorsParent);
 
             //Gives the position and tilemap index for debug purposes
             objec.name = $"{current.x}, {current.y}, index: {tileMap[current.x, current.y]}";
@@ -29,10 +29,10 @@ public class FloorFlood : MonoBehaviour
             //if the tilemap index is 0 (empty space) then add it to the createdFloors list
             if (tileMap[current.x, current.y] == 0)
             {
-                Dungeon2.instance.createdFloors.Add(objec.transform.position);
+                dungeonGenerator.createdFloors.Add(objec.transform.position);
             }
 
-            if (Dungeon2.instance.generationType == GenerationType.Timed || Dungeon2.instance.generationType == GenerationType.TimedStep)
+            if (dungeonGenerator.generationType == GenerationType.Timed || dungeonGenerator.generationType == GenerationType.TimedStep)
             {
                 yield return new WaitForSeconds(stepDelay);
             }

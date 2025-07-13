@@ -6,7 +6,7 @@ using UnityEngine;
 public class PathFinder : MonoBehaviour
 {
     [Header("Required Class")]
-    [SerializeField] private DungeonGenerator dungeonGenerator;
+    [SerializeField] private Dungeon2 dungeonGenerator;
 
     [Header("Camera")]
     [SerializeField] Camera skyCamera;

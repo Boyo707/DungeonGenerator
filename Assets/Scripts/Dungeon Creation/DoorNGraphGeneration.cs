@@ -4,11 +4,9 @@ using UnityEngine;
 
 public class DoorNGraphGeneration : MonoBehaviour
 {
-    public IEnumerator CreateDoorGraph(float stepDelay, int dungeonSeed)
+    public IEnumerator CreateDoorGraph(float stepDelay, int dungeonSeed, Dungeon2 dungeonGenerator)
     {
         Random.InitState(dungeonSeed);
-
-        Dungeon2 dungeonGenerator = Dungeon2.instance;
 
         Graph<RectInt> connections = new();
 
@@ -33,7 +31,7 @@ public class DoorNGraphGeneration : MonoBehaviour
                 foreach (RectInt node in dungeonGenerator.createdRooms)
                 {
                     //Checks if there is room for a door, it has not been discovered and if it's already in the roomAdjacencyList.
-                    if (CanAddDoor(current, node) && !Discovered.Contains(node) && !connections.GetNodes().Contains(node))
+                    if (CanAddDoor(current, node, dungeonGenerator) && !Discovered.Contains(node) && !connections.GetNodes().Contains(node))
                     {
                         //Creates an edge between the two rooms
                         connections.AddEdge(current, node);
@@ -45,7 +43,7 @@ public class DoorNGraphGeneration : MonoBehaviour
                     if (Discovered.Contains(neighbour))
                     {
                         //If a neighbour has been discovered before, add a door between them
-                        RectInt door = CreateDoor(neighbour, current);
+                        RectInt door = CreateDoor(neighbour, current, dungeonGenerator);
 
                         Discovered.Add(door);
 
@@ -75,13 +73,13 @@ public class DoorNGraphGeneration : MonoBehaviour
     }
 
     //Adding Doors
-    public bool CanAddDoor(RectInt roomA, RectInt roomB)
+    public bool CanAddDoor(RectInt roomA, RectInt roomB, Dungeon2 dungeonGenerator)
     {
         if (roomA != roomB)
         {
             RectInt intersection = AlgorithmsUtils.Intersect(roomA, roomB);
 
-            int doorArea = (Dungeon2.instance.doorWidth * 2) * Dungeon2.instance.wallMargin;
+            int doorArea = (dungeonGenerator.doorWidth * 2) * dungeonGenerator.wallMargin;
 
             int intersectingArea = intersection.width * intersection.height;
 
@@ -93,7 +91,7 @@ public class DoorNGraphGeneration : MonoBehaviour
 
         return false;
     }
-    public RectInt CreateDoor(RectInt currentRoom, RectInt overlappingRoom)
+    public RectInt CreateDoor(RectInt currentRoom, RectInt overlappingRoom, Dungeon2 dungeonGenerator)
     {
         //gets the overlapping intersection of the rooms
         RectInt wall = AlgorithmsUtils.Intersect(currentRoom, overlappingRoom);
@@ -101,16 +99,16 @@ public class DoorNGraphGeneration : MonoBehaviour
         if (wall.width > wall.height)
         {
             //choses a random position inside the intersection
-            int randomX = Random.Range(wall.xMin + Dungeon2.instance.wallMargin, wall.xMax - Dungeon2.instance.wallMargin * 2);
+            int randomX = Random.Range(wall.xMin + dungeonGenerator.wallMargin, wall.xMax - dungeonGenerator.wallMargin * 2);
 
-            return new RectInt(randomX, wall.y, Dungeon2.instance.doorWidth, wall.height);
+            return new RectInt(randomX, wall.y, dungeonGenerator.doorWidth, wall.height);
         }
         else
         {
             //choses a random position inside the intersection
-            int randomY = Random.Range(wall.yMin + Dungeon2.instance.wallMargin, wall.yMax - Dungeon2.instance.wallMargin * 2);
+            int randomY = Random.Range(wall.yMin + dungeonGenerator.wallMargin, wall.yMax - dungeonGenerator.wallMargin * 2);
 
-            return new RectInt(wall.x, randomY, wall.width, Dungeon2.instance.doorWidth);
+            return new RectInt(wall.x, randomY, wall.width, dungeonGenerator.doorWidth);
         }
 
     }

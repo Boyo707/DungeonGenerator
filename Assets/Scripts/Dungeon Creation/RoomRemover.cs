@@ -4,7 +4,7 @@ using UnityEngine;
 public class RoomRemover : MonoBehaviour
 {
 
-    public List<RectInt> SortRooms(List<RectInt> rooms)
+    public List<RectInt> SortRooms(List<RectInt> rooms, Dungeon2 dungeonGenerator)
     {
         //gets 10% off the current amount of rooms
         int amountToRemove = Mathf.RoundToInt(0.10f * rooms.Count);
@@ -25,7 +25,7 @@ public class RoomRemover : MonoBehaviour
 
         for (int i = 0; i < roomsToRemove.Count; i++)
         {
-            if (AreAllRoomsConnected(rooms, roomsToRemove[i]))
+            if (AreAllRoomsConnected(rooms, roomsToRemove[i], dungeonGenerator))
             {
                 removedRoomsCount++;
                 rooms.Remove(roomsToRemove[i]);
@@ -43,7 +43,7 @@ public class RoomRemover : MonoBehaviour
 
         return rooms;
     }
-    private bool AreAllRoomsConnected(List<RectInt> rooms, RectInt roomToRemove)
+    private bool AreAllRoomsConnected(List<RectInt> rooms, RectInt roomToRemove, Dungeon2 dungeonGenerator)
     {
         Queue<RectInt> Q = new();
         HashSet<RectInt> discovered = new();
@@ -58,7 +58,7 @@ public class RoomRemover : MonoBehaviour
             {
                 discovered.Add(current);
 
-                foreach (RectInt neighbour in GetOverlappingRooms(rooms, current))
+                foreach (RectInt neighbour in GetOverlappingRooms(rooms, current, dungeonGenerator))
                 {
                     Q.Enqueue(neighbour);
                 }
@@ -72,10 +72,10 @@ public class RoomRemover : MonoBehaviour
         return false;
     }
 
-    private List<RectInt> GetOverlappingRooms(List<RectInt> rooms, RectInt targetRoom)
+    private List<RectInt> GetOverlappingRooms(List<RectInt> rooms, RectInt targetRoom, Dungeon2 dungeonGenerator)
     {
         List<RectInt> overlappingRooms = new();
-        int doorArea = (Dungeon2.instance.doorWidth * 2) * Dungeon2.instance.wallMargin;
+        int doorArea = (dungeonGenerator.doorWidth * 2) * dungeonGenerator.wallMargin;
 
         foreach (var room in rooms)
         {

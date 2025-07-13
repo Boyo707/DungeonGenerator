@@ -7,11 +7,9 @@ public class RoomSplitting : MonoBehaviour
     //somehow get this within the enumerator
     private bool isHorizontalSplit = false;
 
-    public IEnumerator Splitting(float stepDelay, int dungeonSeed)
+    public IEnumerator Splitting(float stepDelay, int dungeonSeed, Dungeon2 dungeonGeneration)
     {
         Random.InitState(dungeonSeed);
-
-        Dungeon2 dungeonGeneration = Dungeon2.instance;
 
         List<RectInt> createdRooms = new();
 
@@ -30,11 +28,11 @@ public class RoomSplitting : MonoBehaviour
             isHorizontalSplit = !isHorizontalSplit;
 
             //If it can split the room and it has not been discovered
-            if (!discovered.Contains(currentRoom) && CanSplitRoom(currentRoom, isHorizontalSplit))
+            if (!discovered.Contains(currentRoom) && CanSplitRoom(currentRoom, isHorizontalSplit, dungeonGeneration.minRoomSize))
             {
                 discovered.Add(currentRoom);
 
-                RectInt[] splitRooms = SplitRoom(currentRoom, isHorizontalSplit);
+                RectInt[] splitRooms = SplitRoom(currentRoom, isHorizontalSplit, dungeonGeneration.minRoomSize, dungeonGeneration.wallMargin);
 
                 //Remove the big room after it gets split
                 createdRooms.Remove(currentRoom);
@@ -59,14 +57,14 @@ public class RoomSplitting : MonoBehaviour
             }
         }
     }
-    public bool CanSplitRoom(RectInt currentRoom, bool checkingHorizontal)
+    public bool CanSplitRoom(RectInt currentRoom, bool checkingHorizontal, int minRoomSize)
     {
         for (int i = 0; i < 2; i++)
         {
             if (checkingHorizontal)
             {
                 //calculates if the minimal room size can fit in the current room split.
-                if (currentRoom.height - Dungeon2.instance.minRoomSize > Dungeon2.instance.minRoomSize)
+                if (currentRoom.height - minRoomSize > minRoomSize)
                 {
                     isHorizontalSplit = checkingHorizontal;
                     return true;
@@ -79,7 +77,7 @@ public class RoomSplitting : MonoBehaviour
             else
             {
                 //calculates if the minimal room size can fit in the current room split.
-                if (currentRoom.width - Dungeon2.instance.minRoomSize > Dungeon2.instance.minRoomSize)
+                if (currentRoom.width - minRoomSize > minRoomSize)
                 {
                     isHorizontalSplit = checkingHorizontal;
                     return true;
@@ -94,32 +92,32 @@ public class RoomSplitting : MonoBehaviour
         //false when it's not possible to split from any side
         return false;
     }
-    public RectInt[] SplitRoom(RectInt currentRoom, bool isHorizontal)
+    public RectInt[] SplitRoom(RectInt currentRoom, bool isHorizontal, int minRoomSize, int wallMargin)
     {
         RectInt[] nextRoomArray = new RectInt[2];
 
         //Checks which direction it has been split in
         if (isHorizontal)
         {
-            int splitPosition = Random.Range(Dungeon2.instance.minRoomSize, currentRoom.height - Dungeon2.instance.minRoomSize);
+            int splitPosition = Random.Range(minRoomSize, currentRoom.height - minRoomSize);
 
             Vector2Int roomSize1 = new(currentRoom.width, splitPosition);
             Vector2Int roomSize2 = new(currentRoom.width, currentRoom.height - splitPosition);
 
             //Bottom Room Rect
-            nextRoomArray[0] = new(currentRoom.x, currentRoom.y, roomSize1.x, roomSize1.y + Dungeon2.instance.wallMargin);
+            nextRoomArray[0] = new(currentRoom.x, currentRoom.y, roomSize1.x, roomSize1.y + wallMargin);
             //Top Room Rect
             nextRoomArray[1] = new(currentRoom.x, currentRoom.y + roomSize1.y, roomSize2.x, roomSize2.y);
         }
         else
         {
-            int splitPosition = Random.Range(Dungeon2.instance.minRoomSize, currentRoom.width - Dungeon2.instance.minRoomSize);
+            int splitPosition = Random.Range(minRoomSize, currentRoom.width - minRoomSize);
 
             Vector2Int roomSize1 = new(splitPosition, currentRoom.height);
             Vector2Int roomSize2 = new(currentRoom.width - splitPosition, currentRoom.height);
 
             //Left Room Rect
-            nextRoomArray[0] = new(currentRoom.x, currentRoom.y, roomSize1.x + Dungeon2.instance.wallMargin, roomSize1.y);
+            nextRoomArray[0] = new(currentRoom.x, currentRoom.y, roomSize1.x + wallMargin, roomSize1.y);
             //Right Room Rect
             nextRoomArray[1] = new(roomSize1.x + currentRoom.x, currentRoom.y, roomSize2.x, roomSize2.y);
         }

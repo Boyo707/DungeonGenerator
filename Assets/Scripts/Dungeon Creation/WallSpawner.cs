@@ -4,17 +4,16 @@ using UnityEngine;
 
 public class WallSpawner : MonoBehaviour
 {
-    public IEnumerator GenerateWalls(float stepDelay, int dungeonSeed)
+    public IEnumerator GenerateWalls(float stepDelay, int dungeonSeed, Dungeon2 dungeonGeneration)
     {
         Random.InitState(dungeonSeed);
 
-        List<RectInt> createdRooms = Dungeon2.instance.createdRooms;
-        List<RectInt> createdDoors = Dungeon2.instance.createdDoors;
+        List<RectInt> createdRooms = dungeonGeneration.createdRooms;
 
-        GameObject[] prefabs = Dungeon2.instance.wallPrefabs;
+        GameObject[] prefabs = dungeonGeneration.wallPrefabs;
         
-        int[,] tileMap = new int[Dungeon2.instance.dungeonSize.height, Dungeon2.instance.dungeonSize.width];
-        Dungeon2.instance.tileMap = tileMap;
+        int[,] tileMap = new int[dungeonGeneration.dungeonSize.height, dungeonGeneration.dungeonSize.width];
+        dungeonGeneration.tileMap = tileMap;
 
         //This will ensure that all the rooms will not how walls going throught it
         //This can only happen if the wall margin is set to a big variable
@@ -31,7 +30,7 @@ public class WallSpawner : MonoBehaviour
         }
 
         //makes an empty space fior the doors
-        foreach (var door in createdDoors)
+        foreach (var door in dungeonGeneration.createdDoors)
         {
             AlgorithmsUtils.FillRectangleOutline(tileMap, door, 0);
         }
@@ -113,11 +112,11 @@ public class WallSpawner : MonoBehaviour
                 }
 
                 //instantiates the wall at the next position
-                GameObject prefab = Instantiate(wall, new Vector3(j + Dungeon2.instance.offset.x, 0 + Dungeon2.instance.offset.y, i + Dungeon2.instance.offset.z), Quaternion.identity, Dungeon2.instance.wallsParent);
+                GameObject prefab = Instantiate(wall, new Vector3(j + dungeonGeneration.offset.x, 0 + dungeonGeneration.offset.y, i + dungeonGeneration.offset.z), Quaternion.identity, dungeonGeneration.wallsParent);
 
                 //sets the rotation of the object
                 prefab.transform.localEulerAngles = rotation;
-                if (Dungeon2.instance.generationType == GenerationType.Timed || Dungeon2.instance.generationType == GenerationType.TimedStep)
+                if (dungeonGeneration.generationType == GenerationType.Timed || dungeonGeneration.generationType == GenerationType.TimedStep)
                 {
                     yield return new WaitForSeconds(stepDelay);
                 }
