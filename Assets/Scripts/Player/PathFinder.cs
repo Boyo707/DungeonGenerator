@@ -44,28 +44,24 @@ public class PathFinder : MonoBehaviour
 
     public void SetGraph(List<Vector3> createdFloors, RectInt dungeonSize)
     {
-        //gets the floors
         floors = createdFloors;
 
-        //sets the dungeon size
         this.dungeonSize = dungeonSize;
 
-        //Generates the graph
         GenerateGraph();
 
         //Once it's done generating it will show the generated graph
         hasGeneratedGraph = true;
 
+        //switches the camera in the sky off and switches to the player camera
         skyCamera.enabled = false;
     }
 
     #region GeneratingGraph
     void GenerateGraph()
     {
-        //clears the graph if there was something there already
         graph.Clear();
 
-        //loops through the position of the dungeon
         for (int x = dungeonSize.xMin; x < dungeonSize.xMax; x++)
         {
             for (int y = dungeonSize.yMin; y < dungeonSize.yMax; y++)
@@ -86,7 +82,6 @@ public class PathFinder : MonoBehaviour
                 TryConnectNeighbor(x - 1, y - 1, currentPos); //Bottom left
             }
         }
-
         Debug.Log("Finished creating player walkable Path");
     }
     private void TryConnectNeighbor(int nx, int ny, Vector3 currentPos)
@@ -109,126 +104,104 @@ public class PathFinder : MonoBehaviour
 
     public List<Vector3> CalculatePath(Vector3 from, Vector3 to)
     {
-        //the playerposition is the from
         Vector3 playerPosition = from;
 
-        //finds the closest node to the player
         startNode = GetClosestNodeToPosition(playerPosition);
 
-        //finds the closest clicked node 
         endNode = GetClosestNodeToPosition(to);
 
-        //calculates the path in Astar
         return AStar(startNode, endNode);
     }
     private Vector3 GetClosestNodeToPosition(Vector3 position)
     {
         
-        //Lowers the position to 0 for better reach
-        Vector3 loweredPos = new Vector3(position.x, 0.00f, position.z);
+        //Lowers the position to 0 for more accurate calculations
+        Vector3 loweredPos = new Vector3(position.x, 0, position.z);
         
-        // Gets the nodes of the graph and loops through them
         List<Vector3> nodes = graph.GetNodes();
+
         for (int i = 0; i < nodes.Count; i++)
         {
-
-            //If it found a node that's closer then 0.6 then return
             if (Vector3.Distance(nodes[i], loweredPos) <= 0.6f)
             {
                 return nodes[i];
             }
         }
+
         //if it has not found one then go back to the starting position
         return startNode;
     }
 
     List<Vector3> AStar(Vector3 start, Vector3 end)
     {
-        //clears the previous discovered path
         discovered.Clear();
 
-        //v = the starting node
         Vector3 v = start;
 
-        //creates a list Queue with priorites on the node
-        List<(Vector3 node, float priority)> Q = new List<(Vector3, float)>();
+        List<(Vector3 node, float priority)> priorityQueue = new List<(Vector3, float)>();
 
-        //Costs of the Node
-        Dictionary<Vector3, float> C = new();
-        //Parents of the the nodes
-        Dictionary<Vector3, Vector3> P = new();
+        Dictionary<Vector3, float> cost = new();
 
-        Q.Add((v, 0));
+        Dictionary<Vector3, Vector3> parent = new();
+
+        priorityQueue.Add((v, 0));
         discovered.Add(v);
 
-        //sets the cost of the first node on 0
-        C[v] = 0;
-        while (Q.Count > 0)
+        cost[v] = 0;
+
+        while (priorityQueue.Count > 0)
         {
             //sorts the Queue by priority
-            Q = Q.OrderByDescending(node => node.priority).ToList();
-            // gets the starting node
-            v = Q[Q.Count - 1].node;
-            Q.RemoveAt(Q.Count - 1);
+            priorityQueue = priorityQueue.OrderByDescending(node => node.priority).ToList();
+            
+            v = priorityQueue[priorityQueue.Count - 1].node;
+            priorityQueue.RemoveAt(priorityQueue.Count - 1);
             discovered.Add(v);
 
             //if the current node is the end node then construct the path towards the node.
             if (v == end)
             {
-                return ReconstructPath(P, start, end);
+                return ReconstructPath(parent, start, end);
             }
 
-            //For every neighbour of the node
             foreach (Vector3 w in graph.GetNeighbors(v))
             {
-                //Set a new cost
-                float newCost = C[v] + Cost(v, w);
+                float newCost = cost[v] + Cost(v, w);
 
-                //if There is no cost on the neighbour OR the newcost is lower then the neighbour cost
-                if (!C.ContainsKey(w) || newCost < C[w])
+                if (!cost.ContainsKey(w) || newCost < cost[w])
                 {
-                    //sets the new cost
-                    C[w] = newCost;
-                    //sets the parent of the node
-                    P[w] = v;
+                    cost[w] = newCost;
 
-                    //adds the neighbour to the Queue and adds a Heuristic
-                    //Heuristic is the distance beteen the neighbour node and the ending node
-                    Q.Add((w, newCost + Heuristic(w, end)));
+                    parent[w] = v;
+
+                    priorityQueue.Add((w, newCost + Heuristic(w, end)));
                 }
             }
         }
-        //returns an empty list if there is no queue anymore
+
         return new List<Vector3>();
     }
 
     public float Cost(Vector3 from, Vector3 to)
     {
-        //The distance between the 2 nodes = the cost
         return Vector3.Distance(from, to);
     }
     public float Heuristic(Vector3 from, Vector3 to)
     {
-        //Distance between the current node and the ending node
         return Vector3.Distance(from, to);
     }
     List<Vector3> ReconstructPath(Dictionary<Vector3, Vector3> parentMap, Vector3 start, Vector3 end)
     {
-        //Creates the path list
         List<Vector3> path = new List<Vector3>();
 
-        //sets the ending node as the starting node
         Vector3 currentNode = end;
 
-        //if the currentNode is not the starting node then loop
         while (currentNode != start)
         {
-            //add the currentNode to the path and set the next node as the current.
             path.Add(currentNode);
             currentNode = parentMap[currentNode];
         }
 
-        //Add the starting node to the path
         path.Add(start);
 
         //reverse the path so it goes from the start to the end and not the reverse.

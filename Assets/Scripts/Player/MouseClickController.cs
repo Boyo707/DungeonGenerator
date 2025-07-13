@@ -5,13 +5,12 @@ using System.Collections.Generic;
 
 public class MouseClickController : MonoBehaviour
 {
-    public Vector3 clickPosition;
+    [SerializeField] private UnityEvent<Vector3> OnClick;
 
-    public UnityEvent<Vector3> OnClick;
-    // Update is called once per frame
+    private Vector3 clickPosition;
+
     void Update()
     {
-        // Get the mouse click position in world space
         if (Input.GetMouseButtonDown(0))
         {
             Ray mouseRay = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -23,8 +22,8 @@ public class MouseClickController : MonoBehaviour
             }
         }
 
-        //draws a sphere and a line towards the clicked destination
         DebugExtension.DebugWireSphere(clickPosition, Color.yellow, .1f);
+
         Debug.DrawLine(Camera.main.transform.position, clickPosition, Color.yellow);
     }
 }

@@ -1,22 +1,42 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.AI;
 
 public class PlayerMovement : MonoBehaviour
 {
-    [SerializeField]
-    private PathFinder pathFinder;
+    [Header("Required Components")]
+    [SerializeField] private PathFinder pathFinder;
+    [SerializeField] private NavMeshAgent navAgent;
 
-    [SerializeField]
-    private float speed = 5f;
+    private enum PathFindingType
+    {
+        AStar,
+        NavMesh
+    }
+
+    [Header("Path Finding Settings")]
+    [SerializeField] private PathFindingType pathFindingType;
+    [SerializeField] private float speed = 5f;
     
     public void GoToDestination(Vector3 destination)
     {
-        //Stops all the coroutines of the path follower
+        //stops any coroutines before it.
         StopAllCoroutines();
 
-        //Starts the follow path coroutine after it has calculated the path from the player to its destination.
-        StartCoroutine(FollowPathCoroutine(pathFinder.CalculatePath(transform.position, destination)));
+        if(pathFindingType == PathFindingType.AStar)
+        {
+            //if navAgent is enabled, the player will stutter as nav agent tries to reposition.
+            navAgent.enabled = false;
+
+            StartCoroutine(FollowPathCoroutine(pathFinder.CalculatePath(transform.position, destination)));
+        }
+        else
+        {
+            navAgent.enabled = true;
+            navAgent.destination = destination;
+            navAgent.speed = speed;
+        }
     }
 
     IEnumerator FollowPathCoroutine(List<Vector3> path)
@@ -33,13 +53,11 @@ public class PlayerMovement : MonoBehaviour
             //pushes the target up 1 to compensate player size
             Vector3 target = path[i] + Vector3.up;
 
-            //If the distance between the next node and the player is more then 0.1f then move towards destination.
             while (Vector3.Distance(transform.position, target) > 0.1f)
             {
                 transform.position = Vector3.MoveTowards(transform.position, target, Time.deltaTime * speed);
                 yield return null;
             }
-            Debug.Log($"Reached target: {target}");
         }
     }
 }

@@ -182,7 +182,6 @@ GameObject:
   - component: {fileID: 184818562}
   - component: {fileID: 184818559}
   - component: {fileID: 184818561}
-  - component: {fileID: 184818560}
   - component: {fileID: 184818564}
   m_Layer: 0
   m_Name: DungeonGenerator
@@ -240,18 +239,6 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7d8e89bd0ccddd348a1aa42bfbac4d8e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
---- !u!114 &184818560
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 184818554}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: dbf519b4b9d870c4983444667a2c5b01, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
 --- !u!114 &184818561
@@ -320,8 +307,6 @@ MonoBehaviour:
   createdRooms: []
   createdDoors: []
   createdFloors: []
-  drawColors: []
-  depthColor: {r: 1, g: 0, b: 0, a: 1}
 --- !u!114 &184818564
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -753,7 +738,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e3f6c3211dc14ed44aa7f3b7388c59e2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  clickPosition: {x: 0, y: 0, z: 0}
   OnClick:
     m_PersistentCalls:
       m_Calls:
@@ -828,6 +812,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1044616618}
   - component: {fileID: 1044616617}
+  - component: {fileID: 1044616620}
   - component: {fileID: 1044616616}
   - component: {fileID: 1044616615}
   - component: {fileID: 1044616619}
@@ -904,6 +889,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   pathFinder: {fileID: 59831574}
+  navAgent: {fileID: 1044616620}
+  pathFindingType: 0
   speed: 5
 --- !u!4 &1044616618
 Transform:
@@ -946,6 +933,28 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!195 &1044616620
+NavMeshAgent:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1044616613}
+  m_Enabled: 1
+  m_AgentTypeID: 0
+  m_Radius: 0.5
+  m_Speed: 3.5
+  m_Acceleration: 8
+  avoidancePriority: 50
+  m_AngularSpeed: 120
+  m_StoppingDistance: 0
+  m_AutoTraverseOffMeshLink: 1
+  m_AutoBraking: 1
+  m_AutoRepath: 1
+  m_Height: 2
+  m_BaseOffset: 1
+  m_WalkableMask: 4294967295
+  m_ObstacleAvoidanceType: 4
 --- !u!1 &1284624387
 GameObject:
   m_ObjectHideFlags: 0

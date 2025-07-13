@@ -39,7 +39,7 @@ public class RoomRemover : MonoBehaviour
         Debug.Log($"Removed {removedRoomsCount} out of the {amountToRemove}");
         
         //sorts the rooms by position
-        rooms.Sort((a, b) => a.position.x * a.position.y - b.position.x * b.position.y);
+        rooms.Sort((a, b) => (a.position.x + a.position.y) - (b.position.x + b.position.y));
 
         return rooms;
     }
