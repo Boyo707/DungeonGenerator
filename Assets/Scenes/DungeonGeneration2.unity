@@ -178,8 +178,8 @@ GameObject:
   - component: {fileID: 184818556}
   - component: {fileID: 184818563}
   - component: {fileID: 184818558}
-  - component: {fileID: 184818562}
   - component: {fileID: 184818557}
+  - component: {fileID: 184818562}
   - component: {fileID: 184818559}
   - component: {fileID: 184818561}
   - component: {fileID: 184818560}
@@ -241,8 +241,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7d8e89bd0ccddd348a1aa42bfbac4d8e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  createdRooms: []
-  createdDoors: []
 --- !u!114 &184818560
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -281,8 +279,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 31bcb68fa400c59459a402f838094d31, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  createdRooms: []
-  createdDoors: []
 --- !u!114 &184818563
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -302,18 +298,22 @@ MonoBehaviour:
     height: 50
   canSplitRandomly: 0
   splitDepth: 0
-  minRoomSize: 5
+  minRoomSize: 4
   wallMargin: 1
   doorWidth: 2
   dungeonSeed: 0
   generationType: 3
-  stepDelay: 0.1
-  wallsParent: {fileID: 0}
-  floorsParent: {fileID: 0}
-  offset: {x: 0, y: 0, z: 0}
-  wallPrefabs: []
-  player: {fileID: 0}
-  pathFinder: {fileID: 0}
+  stepDelay: 0
+  wallsParent: {fileID: 1743453381}
+  floorsParent: {fileID: 1718480650}
+  offset: {x: 1, y: 0, z: 1}
+  wallPrefabs:
+  - {fileID: 3204687337251383887, guid: ee2ec93b0f8db314d99c5c4ca581bc18, type: 3}
+  - {fileID: 4038827269175978573, guid: 8c9cc736ad3c4ab4087aade106396a5d, type: 3}
+  - {fileID: 4862822757559228577, guid: 1c1a5dedafe1904459427c483ba611d0, type: 3}
+  - {fileID: 1040310750116940119, guid: b691f74e537589c45b55947cb8bfa721, type: 3}
+  player: {fileID: 1044616618}
+  pathFinder: {fileID: 59831574}
   showRoomOutline: 1
   showDoorsOutline: 1
   showConnectionGraph: 1

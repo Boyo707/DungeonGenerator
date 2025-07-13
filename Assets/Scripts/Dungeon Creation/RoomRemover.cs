@@ -6,62 +6,89 @@ public class RoomRemover : MonoBehaviour
 
     public List<RectInt> SortRooms(List<RectInt> rooms)
     {
+        //gets 10% off the current amount of rooms
+        int amountToRemove = Mathf.RoundToInt(0.10f * rooms.Count);
+
+        int removedRoomsCount = 0;
+
+        List<RectInt> roomsToRemove = new();
+
         //sorts the rooms based on size
-        BubbleSorter(rooms, SortingType.Size);
+        rooms.Sort ((a,b) => a.width * a.height - b.width * b.height);
 
-        //createdRooms.Sort ((a,b) => a.width * a.height - b.width * b.height);
+        Debug.Log($"Removing {amountToRemove} out of the {rooms.Count}");
 
-        //calculates how many rooms are in the 10%
-        int amountOfRooms = Mathf.RoundToInt(0.10f * rooms.Count);
-
-        //removes 10% of all the rooms
-        for (int i = 0; i < amountOfRooms; i++)
+        for (int i = 0; i < amountToRemove; i++)
         {
-            rooms.RemoveAt(i);
+            roomsToRemove.Add(rooms[i]);
         }
-        //sorts the rooms by position
-        BubbleSorter(rooms, SortingType.Position);
 
-        //If the room has no neighbours then remove that room from the list
-        /*if (GetNeighbours(current).Count == 0)
+        for (int i = 0; i < roomsToRemove.Count; i++)
         {
-            createdRooms.Remove(current);
-            stackRooms.Push(createdRooms[0]);
-        }*/
+            if (AreAllRoomsConnected(rooms, roomsToRemove[i]))
+            {
+                removedRoomsCount++;
+                rooms.Remove(roomsToRemove[i]);
+            }
+            else
+            {
+                Debug.Log($"Couldn't remove {roomsToRemove[i]}");
+            }
+        }
+
+        Debug.Log($"Removed {removedRoomsCount} out of the {amountToRemove}");
+        
+        //sorts the rooms by position
+        rooms.Sort((a, b) => a.position.x * a.position.y - b.position.x * b.position.y);
 
         return rooms;
     }
-
-    private void BubbleSorter(List<RectInt> rooms, SortingType type)
+    private bool AreAllRoomsConnected(List<RectInt> rooms, RectInt roomToRemove)
     {
-        //Loops through all the rooms and going down the count
-        for (int i = rooms.Count - 2; i >= 0; i--)
+        Queue<RectInt> Q = new();
+        HashSet<RectInt> discovered = new();
+
+        Q.Enqueue(rooms[rooms.Count - 1]);
+
+        while (Q.Count != 0)
         {
-            //loops each time till it reaches i
-            for (int j = 0; j <= i; j++)
+            RectInt current = Q.Dequeue();
+
+            if (!discovered.Contains(current) && current != roomToRemove)
             {
-                int sizeA = 0;
-                int sizeB = 0;
+                discovered.Add(current);
 
-                if (type == SortingType.Size)
+                foreach (RectInt neighbour in GetOverlappingRooms(rooms, current))
                 {
-                    sizeA = rooms[j].width + rooms[j].height;
-                    sizeB = rooms[j + 1].width + rooms[j + 1].height;
-                }
-                else if (type == SortingType.Position)
-                {
-                    sizeA = rooms[j].x + rooms[j].y;
-                    sizeB = rooms[j + 1].x + rooms[j + 1].y;
-                }
-
-                if (sizeA > sizeB)
-                {
-                    RectInt temp = rooms[j + 1];
-                    rooms[j + 1] = rooms[j];
-                    rooms[j] = temp;
+                    Q.Enqueue(neighbour);
                 }
             }
         }
+
+        if (discovered.Count == rooms.Count - 1)
+        {
+            return true;
+        }
+        return false;
     }
 
+    private List<RectInt> GetOverlappingRooms(List<RectInt> rooms, RectInt targetRoom)
+    {
+        List<RectInt> overlappingRooms = new();
+        int doorArea = (Dungeon2.instance.doorWidth * 2) * Dungeon2.instance.wallMargin;
+
+        foreach (var room in rooms)
+        {
+            RectInt intersection = AlgorithmsUtils.Intersect(room, targetRoom);
+
+            int intersectingArea = intersection.width * intersection.height;
+
+            if (intersectingArea > doorArea)
+            {
+                overlappingRooms.Add(room);
+            }
+        }
+
+        return overlappingRooms;
+    }
 }

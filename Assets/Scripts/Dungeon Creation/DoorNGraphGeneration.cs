@@ -1,18 +1,16 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using static UnityEngine.CompositeCollider2D;
 
 public class DoorNGraphGeneration : MonoBehaviour
 {
-
-    public IEnumerator CreateDoorGraph(float stepDelay)
+    public IEnumerator CreateDoorGraph(float stepDelay, int dungeonSeed)
     {
+        Random.InitState(dungeonSeed);
+
         Dungeon2 dungeonGenerator = Dungeon2.instance;
 
         Graph<RectInt> connections = new();
-        List<RectInt> createdDoors = new();
-
 
         //creation of the doors and Graph
         Stack<RectInt> stackRooms = new();
@@ -30,29 +28,8 @@ public class DoorNGraphGeneration : MonoBehaviour
             //If the current room has not been discovered
             if (!Discovered.Contains(current))
             {
-                //Adds this room the the discovery list
                 Discovered.Add(current);
 
-                //Checks through all the neighbours to see if they are discovered yet
-                foreach (RectInt neighbour in connections.GetNeighbors(current))
-                {
-                    if (Discovered.Contains(neighbour))
-                    {
-                        //If a neighbour has been discovered before, add a room between them
-                        RectInt door = CreateDoor(neighbour, current);
-
-                        Discovered.Add(door);
-
-                        connections.AddEdge(door, current);
-                        connections.AddEdge(door, neighbour);
-
-                        connections.RemoveEdge(current, neighbour);
-
-                        createdDoors.Add(door);
-                    }
-                }
-
-                //Searches through the created rooms
                 foreach (RectInt node in dungeonGenerator.createdRooms)
                 {
                     //Checks if there is room for a door, it has not been discovered and if it's already in the roomAdjacencyList.
@@ -63,18 +40,31 @@ public class DoorNGraphGeneration : MonoBehaviour
                     }
                 }
 
-                //Pushes all the neighbours of this room to the stack
-                foreach (RectInt node in connections.GetNeighbors(current))
+                foreach (RectInt neighbour in connections.GetNeighbors(current))
                 {
-                    if (!Discovered.Contains(node))
+                    if (Discovered.Contains(neighbour))
                     {
-                        stackRooms.Push(node);
+                        //If a neighbour has been discovered before, add a door between them
+                        RectInt door = CreateDoor(neighbour, current);
+
+                        Discovered.Add(door);
+
+                        connections.AddEdge(door, current);
+                        connections.AddEdge(door, neighbour);
+
+                        connections.RemoveEdge(current, neighbour);
+
+                        dungeonGenerator.createdDoors.Add(door);
+                    }
+                    else
+                    {
+                        //if the neighbour has not been discovered, add to stack
+                        stackRooms.Push(neighbour);
                     }
                 }
 
                 //aplies the new list/graph to the main one
                 dungeonGenerator.roomAdjacencyList = connections;
-                dungeonGenerator.createdDoors = createdDoors;
 
                 if (dungeonGenerator.generationType == GenerationType.Timed || dungeonGenerator.generationType == GenerationType.TimedStep)
                 {

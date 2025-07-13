@@ -30,7 +30,7 @@ public class RoomSplitting : MonoBehaviour
             isHorizontalSplit = !isHorizontalSplit;
 
             //If it can split the room and it has not been discovered
-            if (!discovered.Contains(currentRoom) && CanSplitRoom(currentRoom, discovered, isHorizontalSplit))
+            if (!discovered.Contains(currentRoom) && CanSplitRoom(currentRoom, isHorizontalSplit))
             {
                 discovered.Add(currentRoom);
 
@@ -51,7 +51,6 @@ public class RoomSplitting : MonoBehaviour
                     //assigngs the current depth color to this room
                     //dungeonGeneration.drawColors.Add(dungeonGeneration.depthColor);
 
-
                     if (dungeonGeneration.generationType == GenerationType.Timed || dungeonGeneration.generationType == GenerationType.TimedStep)
                     {
                         yield return new WaitForSeconds(stepDelay);
@@ -60,7 +59,7 @@ public class RoomSplitting : MonoBehaviour
             }
         }
     }
-    public bool CanSplitRoom(RectInt currentRoom, HashSet<RectInt> discovered, bool checkingHorizontal)
+    public bool CanSplitRoom(RectInt currentRoom, bool checkingHorizontal)
     {
         for (int i = 0; i < 2; i++)
         {

@@ -52,9 +52,12 @@ public class Dungeon2 : MonoBehaviour
 
     [SerializeField] public List<RectInt> createdRooms = new();
     [SerializeField] public List<RectInt> createdDoors = new();
-    [SerializeField] private List<Vector3> createdFloors = new();
+    [SerializeField] public List<Vector3> createdFloors = new();
 
     public Graph<RectInt> roomAdjacencyList = new();
+
+    public int[,] tileMap;
+
 
     private RoomSplitting roomSplitting;
     private DoorNGraphGeneration doorNGraphGen;
@@ -104,7 +107,7 @@ public class Dungeon2 : MonoBehaviour
         minRoomSize += wallMargin;
         
         //Start Generation
-        StartCoroutine(Generation(dungeonSize));
+        StartCoroutine(Generation());
     }
 
     // Update is called once per frame
@@ -154,7 +157,7 @@ public class Dungeon2 : MonoBehaviour
         floorsParent.gameObject.SetActive(showVisuals);*/
     }
 
-    IEnumerator Generation(RectInt room)
+    IEnumerator Generation()
     {
         //rooms splitting
         yield return StartCoroutine(roomSplitting.Splitting(stepDelay, dungeonSeed));
@@ -163,40 +166,39 @@ public class Dungeon2 : MonoBehaviour
         yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
 
-        //Create the door and graph
-        StartCoroutine(doorNGraphGen.CreateDoorGraph(stepDelay));
-        Debug.Log("Finished creating the Doors and the Graph");
-
-
-        yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
-        continueStep = false;
-
         //Removed 10% of the room and sort the rooms by size
-        createdRooms = roomRemover.SortRooms(createdRooms);
+        yield return createdRooms = roomRemover.SortRooms(createdRooms);
         Debug.Log("Finished Room Sorting And Removed 10% of the smallest rooms");
 
         yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
 
+        //Create the door and graph
+        yield return StartCoroutine(doorNGraphGen.CreateDoorGraph(stepDelay, dungeonSeed));
+        Debug.Log("Finished creating the Doors and the Graph");
+
+        yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
+        continueStep = false;
+
         //Create the walls
-        StartCoroutine(wallSpawner.lol(stepDelay));
+        yield return StartCoroutine(wallSpawner.GenerateWalls(stepDelay, dungeonSeed));
         Debug.Log("Finished creating the walls");
 
         yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
 
         //Flooding the floors
-        StartCoroutine(floorFlood.lol(stepDelay));
+        yield return StartCoroutine(floorFlood.GenerateFloors(stepDelay, dungeonSeed));
         Debug.Log("Finished flooding the rooms with floors");
 
         yield return new WaitUntil(() => continueStep || generationType != GenerationType.Step && generationType != GenerationType.TimedStep);
         continueStep = false;
 
         //set the player position at the first room
-        player.position = new Vector3(createdRooms[0].xMin + 1.5f, 1, createdRooms[0].yMin + 1.5f);
+        //player.position = new Vector3(createdRooms[0].xMin + 1.5f, 1, createdRooms[0].yMin + 1.5f);
 
         //Gives the pathFinder it's required values
-        pathFinder.SetGraph(createdFloors, dungeonSize);
+        //pathFinder.SetGraph(createdFloors, dungeonSize);
         //activate playability
     }
 
