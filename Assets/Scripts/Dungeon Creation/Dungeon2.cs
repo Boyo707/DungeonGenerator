@@ -24,7 +24,6 @@ public class Dungeon2 : MonoBehaviour
 
     [Header("Dungeon Settings")]
     [SerializeField] public RectInt dungeonSize;
-    [SerializeField] public bool canSplitRandomly;
     [SerializeField] public int splitDepth;
     [SerializeField] public int minRoomSize;
     [SerializeField] public int wallMargin = 1;
